@@ -53,7 +53,7 @@ class BalónDePoder
 
 class Canasta
 class CanastaDosPuntos
-class CanastaTres
+class CanastaTresPuntos
 class TiroLibre
 
 class Marcador
@@ -75,7 +75,7 @@ Capitán --|> Jugador
 JugadorEstrella --|> Jugador
 
 CanastaDosPuntos --|> Canasta
-CanastaTres --|> Canasta
+CanastaTresPuntos --|> Canasta
 TiroLibre --|> Canasta
 
 AumentoVelocidad --|> PowerUp
