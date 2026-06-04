@@ -1,0 +1,105 @@
+@startuml StreetHoop_Gameplay
+
+class JuegoStreetHoop {
+    - tiempoJuego
+    - puntajeMaximo
+    - nivelDificultad
+    - estadoJuego
+    + iniciarPartida()
+    + pausarJuego()
+    + finalizarPartida()
+    + actualizarMarcador()
+}
+
+class Jugador {
+    - idJugador
+    - nombre
+    - habilidad
+    - velocidad
+    - defensa
+    - estamina
+    - posicionActual
+    + driblear()
+    + pasarBalon()
+    + tirarACanasta()
+    + defenderJugador()
+    + agotarEstamina()
+}
+
+class Equipo {
+    - nombreEquipo
+    - colorEquipo
+    - puntosEquipo
+    - estrategia
+    + agregarJugador()
+    + removerJugador()
+    + calcularPromedioPotencia()
+}
+
+class Cancha {
+    - dimensionesX
+    - dimensionesY
+    - condicion
+    - tipo
+    + validarPosicion(x, y)
+    + obtenerZonaCancha()
+}
+
+class Pelota {
+    - posicionX
+    - posicionY
+    - velocidad
+    - duenio
+    + cambiarPosicion(x, y)
+    + cambiarVelocidad(nuevaVelocidad)
+    + asignarDuenio(jugador)
+}
+
+class Accion {
+    - tipoAccion
+    - jugadorQueActua
+    - tiempoAccion
+    - resultado
+    + ejecutarDribbling()
+    + ejecutarTiro()
+    + ejecutarPase()
+    + ejecutarDefensa()
+}
+
+class Tiro {
+    - distanciaACanasta
+    - velocidadTiro
+    - angulo
+    - esEncestada
+    + calcularProbabilidadEnceste()
+    + verificarEnceste()
+}
+
+class Canasta {
+    - posicionX
+    - posicionY
+    - puntosOtorgados
+    + registrarEnceste(tiro)
+}
+
+class Marcador {
+    - puntosEquipo1
+    - puntosEquipo2
+    - faltas
+    - tiempoTranscurrido
+    + incrementarPuntos(equipo, puntos)
+    + registrarFalta()
+    + mostrarMarcador()
+}
+
+Tiro --|> Accion
+Equipo "1" *-- "1..*" Jugador : contiene >
+Accion "0..*" o-- "1" Jugador : realiza >
+Accion "1" o-- "1" Pelota : utiliza >
+Pelota "0..*" o-- "1..2" Equipo : pertenece a >
+JuegoStreetHoop "1" *-- "2" Equipo : administra >
+JuegoStreetHoop "1" *-- "1" Cancha : contiene >
+JuegoStreetHoop "1" *-- "1" Marcador : gestiona >
+JuegoStreetHoop "1" *-- "1" Canasta : incluye >
+
+@enduml
