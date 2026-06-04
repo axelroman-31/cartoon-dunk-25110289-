@@ -1,105 +1,106 @@
 @startuml StreetHoop_Gameplay
 
-class JuegoStreetHoop {
-    - tiempoJuego
-    - puntajeMaximo
-    - nivelDificultad
-    - estadoJuego
-    + iniciarPartida()
-    + pausarJuego()
-    + finalizarPartida()
-    + actualizarMarcador()
+class Juego
+class Cancha
+class Equipo
+
+class Jugador{
+- nombre
+- numero
+- habilidad
 }
 
-class Jugador {
-    - idJugador
-    - nombre
-    - habilidad
-    - velocidad
-    - defensa
-    - estamina
-    - posicionActual
-    + driblear()
-    + pasarBalon()
-    + tirarACanasta()
-    + defenderJugador()
-    + agotarEstamina()
+class Base{
++ pasar()
++ dirigir()
 }
 
-class Equipo {
-    - nombreEquipo
-    - colorEquipo
-    - puntosEquipo
-    - estrategia
-    + agregarJugador()
-    + removerJugador()
-    + calcularPromedioPotencia()
+class Ala{
++ conducir()
++ tirar()
 }
 
-class Cancha {
-    - dimensionesX
-    - dimensionesY
-    - condicion
-    - tipo
-    + validarPosicion(x, y)
-    + obtenerZonaCancha()
+class Pivot{
++ bloquear()
++ encestar()
 }
 
-class Pelota {
-    - posicionX
-    - posicionY
-    - velocidad
-    - duenio
-    + cambiarPosicion(x, y)
-    + cambiarVelocidad(nuevaVelocidad)
-    + asignarDuenio(jugador)
+class Alero{
++ defender()
++ robar()
 }
 
-class Accion {
-    - tipoAccion
-    - jugadorQueActua
-    - tiempoAccion
-    - resultado
-    + ejecutarDribbling()
-    + ejecutarTiro()
-    + ejecutarPase()
-    + ejecutarDefensa()
+class Oponente
+class JugadorOfensivo{
++ atacar()
+- morir()
 }
 
-class Tiro {
-    - distanciaACanasta
-    - velocidadTiro
-    - angulo
-    - esEncestada
-    + calcularProbabilidadEnceste()
-    + verificarEnceste()
+class JugadorDefensivo{
++ defender()
++ robar()
+- morir()
 }
 
-class Canasta {
-    - posicionX
-    - posicionY
-    - puntosOtorgados
-    + registrarEnceste(tiro)
-}
+class Capitán
+class JugadorEstrella
 
-class Marcador {
-    - puntosEquipo1
-    - puntosEquipo2
-    - faltas
-    - tiempoTranscurrido
-    + incrementarPuntos(equipo, puntos)
-    + registrarFalta()
-    + mostrarMarcador()
-}
+class PowerUp
+class AumentoVelocidad
+class AumentoFuerza
+class AumentoDefensa
+class BalónDePoder
 
-Tiro --|> Accion
+class Canasta
+class CanastaDosPuntos
+class CanastaTres
+class TiroLibre
+
+class Marcador
+class Cronometro
+class Faltas
+
+class Pelota
+class Accion
+
+Base --|> Jugador
+Ala --|> Jugador
+Pivot --|> Jugador
+Alero --|> Jugador
+
+Oponente --|> Jugador
+JugadorOfensivo --|> Oponente
+JugadorDefensivo --|> Oponente
+Capitán --|> Jugador
+JugadorEstrella --|> Jugador
+
+CanastaDosPuntos --|> Canasta
+CanastaTres --|> Canasta
+TiroLibre --|> Canasta
+
+AumentoVelocidad --|> PowerUp
+AumentoFuerza --|> PowerUp
+AumentoDefensa --|> PowerUp
+BalónDePoder --|> PowerUp
+
+Juego "1" *-- "2" Equipo : administra >
 Equipo "1" *-- "1..*" Jugador : contiene >
+
+Juego "1" *-- "1" Cancha : contiene >
+Cancha "1" *-- "0..*" Canasta
+Cancha "1" *-- "0..*" PowerUp
+Cancha "1" *-- "1" Marcador
+
+Jugador "1" --> "0..*" PowerUp : usar
+Jugador "1" --> "1" Pelota : controla
+
+Marcador "1" o-- "0..*" CanastaDosPuntos
+Marcador "1" o-- "0..*" CanastaTres
+Marcador "1" o-- "0..*" TiroLibre
+
 Accion "0..*" o-- "1" Jugador : realiza >
 Accion "1" o-- "1" Pelota : utiliza >
-Pelota "0..*" o-- "1..2" Equipo : pertenece a >
-JuegoStreetHoop "1" *-- "2" Equipo : administra >
-JuegoStreetHoop "1" *-- "1" Cancha : contiene >
-JuegoStreetHoop "1" *-- "1" Marcador : gestiona >
-JuegoStreetHoop "1" *-- "1" Canasta : incluye >
+
+Capitán "1" o-- "1" Bandera
 
 @enduml
