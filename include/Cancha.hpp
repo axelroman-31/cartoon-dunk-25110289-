@@ -1,119 +1,121 @@
 #pragma once
 #include <SFML/Graphics.hpp>
+#include <cmath>
 #include "Constantes.hpp"
 
-// ============================================================
-//  Cancha  –  dibuja la cancha vista top-down estilo arcade
-// ============================================================
+// ================================================================
+//  Cancha  -  vista top-down estilo arcade
+// ================================================================
 class Cancha {
 public:
-    sf::Color colorPiso    = sf::Color(200, 145, 60);
-    sf::Color colorLineas  = sf::Color(240, 200, 100);
-    sf::Color colorAros    = sf::Color(255, 60, 20);
+    // Paleta de colores (cancha callejera)
+    sf::Color cPiso   = sf::Color(185, 130, 55);
+    sf::Color cLinea  = sf::Color(235, 195, 95);
+    sf::Color cZona   = sf::Color(170, 110, 45);
+    sf::Color cAro    = sf::Color(255, 55, 15);
+    sf::Color cBorde  = sf::Color(145, 90, 25);
 
     void dibujar(sf::RenderWindow& w) {
-        // Fondo de cancha
-        sf::RectangleShape fondo({CANCHA_ANCHO, CANCHA_ALTO});
-        fondo.setPosition(CANCHA_X, CANCHA_Y);
-        fondo.setFillColor(colorPiso);
-        fondo.setOutlineThickness(4.f);
-        fondo.setOutlineColor(sf::Color(160, 100, 30));
-        w.draw(fondo);
+        // Piso principal
+        rect(w, C_X, C_Y, C_ANCHO, C_ALTO, cPiso, cBorde, 4.f);
 
-        // Lineas de cancha (color madera oscuro)
-        sf::Color lc = colorLineas;
+        // Zona de lanzamiento libre (pintada) - izquierda
+        rect(w, C_X, ARO_Y - 95.f, 115.f, 190.f, cZona, cLinea, 2.f);
+        // Zona de lanzamiento libre - derecha
+        rect(w, C_X + C_ANCHO - 115.f, ARO_Y - 95.f, 115.f, 190.f, cZona, cLinea, 2.f);
 
         // Línea central
-        dibujarLinea(w, {CANCHA_X + CANCHA_ANCHO/2.f, CANCHA_Y},
-                        {CANCHA_X + CANCHA_ANCHO/2.f, CANCHA_Y + CANCHA_ALTO}, lc, 2.f);
+        linea(w, {C_X + C_ANCHO/2.f, C_Y}, {C_X + C_ANCHO/2.f, C_Y + C_ALTO}, cLinea, 2.f);
 
         // Círculo central
-        dibujarCirculo(w, {CANCHA_X + CANCHA_ANCHO/2.f, CANCHA_Y + CANCHA_ALTO/2.f},
-                       60.f, lc, 2.f);
+        circulo(w, {C_X + C_ANCHO/2.f, C_Y + C_ALTO/2.f}, 58.f, cLinea, 2.f);
 
-        // Zonas de 3 puntos (semicírculos)
-        // Izquierda
-        dibujarSemicirculo(w, {ARO_IZQUIERDA_X, ARO_Y},
-                           DIST_TRES_PUNTOS, lc, 2.f, false);
-        // Derecha
-        dibujarSemicirculo(w, {ARO_DERECHA_X, ARO_Y},
-                           DIST_TRES_PUNTOS, lc, 2.f, true);
-
-        // Zonas de tiro libre (rectangulares)
-        float zw = 120.f, zh = 200.f;
-        // Izquierda
-        sf::RectangleShape zonaL({zw, zh});
-        zonaL.setPosition(CANCHA_X, ARO_Y - zh/2.f);
-        zonaL.setFillColor(sf::Color(180, 120, 50));
-        zonaL.setOutlineThickness(2.f);
-        zonaL.setOutlineColor(lc);
-        w.draw(zonaL);
-        // Derecha
-        sf::RectangleShape zonaR({zw, zh});
-        zonaR.setPosition(CANCHA_X + CANCHA_ANCHO - zw, ARO_Y - zh/2.f);
-        zonaR.setFillColor(sf::Color(180, 120, 50));
-        zonaR.setOutlineThickness(2.f);
-        zonaR.setOutlineColor(lc);
-        w.draw(zonaR);
+        // Arco de 3 puntos izquierdo
+        arco3p(w, {ARO_IZQ_CX, ARO_Y}, DIST_3P, cLinea, false);
+        // Arco de 3 puntos derecho
+        arco3p(w, {ARO_DER_CX, ARO_Y}, DIST_3P, cLinea, true);
 
         // Tableros y aros
-        dibujarCanasta(w, {ARO_IZQUIERDA_X, ARO_Y}, false);
-        dibujarCanasta(w, {ARO_DERECHA_X,   ARO_Y}, true);
+        canasta(w, {ARO_IZQ_X, ARO_Y}, false);
+        canasta(w, {ARO_DER_X, ARO_Y}, true);
     }
 
 private:
-    void dibujarLinea(sf::RenderWindow& w, sf::Vector2f a, sf::Vector2f b,
-                      sf::Color c, float grosor) {
+    void rect(sf::RenderWindow& w, float x, float y, float aw, float ah,
+              sf::Color fill, sf::Color outline, float ow) {
+        sf::RectangleShape r({aw, ah});
+        r.setPosition(x, y);
+        r.setFillColor(fill);
+        r.setOutlineThickness(ow);
+        r.setOutlineColor(outline);
+        w.draw(r);
+    }
+
+    void linea(sf::RenderWindow& w, sf::Vector2f a, sf::Vector2f b,
+               sf::Color c, float) {
         sf::VertexArray v(sf::Lines, 2);
         v[0].position = a; v[0].color = c;
         v[1].position = b; v[1].color = c;
         w.draw(v);
     }
 
-    void dibujarCirculo(sf::RenderWindow& w, sf::Vector2f centro,
-                        float radio, sf::Color c, float grosor) {
-        sf::CircleShape circulo(radio);
-        circulo.setOrigin(radio, radio);
-        circulo.setPosition(centro);
-        circulo.setFillColor(sf::Color::Transparent);
-        circulo.setOutlineThickness(grosor);
-        circulo.setOutlineColor(c);
-        w.draw(circulo);
+    void circulo(sf::RenderWindow& w, sf::Vector2f centro, float r,
+                 sf::Color c, float ow) {
+        sf::CircleShape cs(r);
+        cs.setOrigin(r, r);
+        cs.setPosition(centro);
+        cs.setFillColor(sf::Color::Transparent);
+        cs.setOutlineThickness(ow);
+        cs.setOutlineColor(c);
+        w.draw(cs);
     }
 
-    void dibujarSemicirculo(sf::RenderWindow& w, sf::Vector2f centro,
-                             float radio, sf::Color c, float grosor, bool miraDerecha) {
-        const int N = 32;
+    // Semicírculo de 3 puntos
+    void arco3p(sf::RenderWindow& w, sf::Vector2f centro, float radio,
+                sf::Color c, bool derecha) {
+        const int N = 36;
         sf::VertexArray va(sf::LinesStrip, N + 1);
         for (int i = 0; i <= N; i++) {
-            float ang = (miraDerecha ? 90.f : -90.f) +
-                        (miraDerecha ? -180.f : 180.f) * (i / (float)N);
-            float rad = ang * 3.14159f / 180.f;
-            va[i].position = {centro.x + std::cos(rad) * radio,
-                               centro.y + std::sin(rad) * radio};
+            float base = derecha ? 90.f : -90.f;
+            float rango = derecha ? -180.f : 180.f;
+            float ang = (base + rango * (i / (float)N)) * 3.14159f / 180.f;
+            va[i].position = {centro.x + std::cos(ang)*radio,
+                               centro.y + std::sin(ang)*radio};
             va[i].color = c;
         }
         w.draw(va);
     }
 
-    void dibujarCanasta(sf::RenderWindow& w, sf::Vector2f pos, bool derecha) {
-        // Tablero
-        float tw = 10.f, th = 60.f;
-        sf::RectangleShape tablero({tw, th});
-        tablero.setOrigin(tw / 2.f, th / 2.f);
+    void canasta(sf::RenderWindow& w, sf::Vector2f pos, bool derecha) {
+        // Tablero (bloque lateral)
+        sf::RectangleShape tablero({8.f, 58.f});
+        tablero.setOrigin(4.f, 29.f);
         tablero.setPosition(pos);
-        tablero.setFillColor(sf::Color(220, 220, 200));
+        tablero.setFillColor(sf::Color(215, 215, 195));
         tablero.setOutlineThickness(2.f);
-        tablero.setOutlineColor(sf::Color(180, 180, 160));
+        tablero.setOutlineColor(sf::Color(170, 170, 150));
         w.draw(tablero);
 
+        // Cuadrado de enceste en el tablero
+        sf::RectangleShape cuad({8.f, 22.f});
+        cuad.setOrigin(4.f, 11.f);
+        cuad.setPosition(pos);
+        cuad.setFillColor(sf::Color::Transparent);
+        cuad.setOutlineThickness(2.f);
+        cuad.setOutlineColor(sf::Color(200, 60, 60));
+        w.draw(cuad);
+
         // Aro
-        sf::CircleShape aro(CANASTA_RADIO);
-        aro.setOrigin(CANASTA_RADIO, CANASTA_RADIO);
-        aro.setPosition(pos.x + (derecha ? -CANASTA_RADIO - 5.f : CANASTA_RADIO + 5.f), pos.y);
+        float cx = pos.x + (derecha ? -(ARO_RADIO + 8.f) : (ARO_RADIO + 8.f));
+        sf::CircleShape aro(ARO_RADIO);
+        aro.setOrigin(ARO_RADIO, ARO_RADIO);
+        aro.setPosition(cx, pos.y);
         aro.setFillColor(sf::Color::Transparent);
         aro.setOutlineThickness(4.f);
-        aro.setOutlineColor(colorAros);
+        aro.setOutlineColor(cAro);
         w.draw(aro);
+
+        // Poste de conexión tablero-aro
+        linea(w, pos, {cx, pos.y}, sf::Color(160,80,20), 2.f);
     }
 };

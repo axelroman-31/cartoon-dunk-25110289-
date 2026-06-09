@@ -2,143 +2,166 @@
 #include <SFML/Graphics.hpp>
 #include <sstream>
 #include <iomanip>
+#include <string>
+#include <cmath>
 #include "Constantes.hpp"
 
-// ============================================================
-//  HUD  –  marcador, tiempo, super meter, mensajes
-// ============================================================
+// ================================================================
+//  HUD  -  marcador, tiempo, super meters, mensajes flash
+// ================================================================
 class HUD {
 public:
     sf::Font fuente;
     bool     fuenteOk = false;
 
-    // Textos
-    sf::Text txtMarcador;
-    sf::Text txtTiempo;
-    sf::Text txtMensaje;
-    sf::Text txtMitad;
-    sf::Text txtSuperEtiqueta;
+    // Mensaje flotante
+    std::string  msgTexto;
+    float        msgTimer = 0.f;
+    sf::Color    msgColor = sf::Color::Yellow;
 
-    // Barras de Super Meter
-    sf::RectangleShape barFondoL, barLlenaL;   // equipo izquierda
-    sf::RectangleShape barFondoR, barLlenaR;   // equipo derecha
-
-    float tiempoMensaje = 0.f;
+    // Animación de flash al anotar
+    float flashTimer = 0.f;
+    sf::Color flashColor;
 
     HUD() {
-        // Fuente de respaldo si no carga el archivo
-        if (fuente.loadFromFile("assets/front/texto.ttf")) {
-            fuenteOk = true;
-        }
-
-        auto initText = [&](sf::Text& t, int size, sf::Color color) {
-            if (fuenteOk) t.setFont(fuente);
-            t.setCharacterSize(size);
-            t.setFillColor(color);
-            t.setOutlineThickness(2.f);
-            t.setOutlineColor(sf::Color::Black);
-        };
-
-        initText(txtMarcador,    32, sf::Color::White);
-        initText(txtTiempo,      26, sf::Color(255,220,80));
-        initText(txtMensaje,     36, sf::Color(255,80,80));
-        initText(txtMitad,       22, sf::Color(200,200,200));
-        initText(txtSuperEtiqueta,14, sf::Color(255,200,0));
-
-        // Barras super meter
-        float barW = 160.f, barH = 14.f;
-        float margen = 20.f;
-        // Izquierda
-        barFondoL.setSize({barW, barH});
-        barFondoL.setFillColor(sf::Color(40,40,40,180));
-        barFondoL.setPosition(margen, ALTO_VENTANA - 36.f);
-        barLlenaL.setSize({barW, barH});
-        barLlenaL.setPosition(margen, ALTO_VENTANA - 36.f);
-        barLlenaL.setFillColor(sf::Color(255,180,0));
-        // Derecha
-        barFondoR.setSize({barW, barH});
-        barFondoR.setFillColor(sf::Color(40,40,40,180));
-        barFondoR.setPosition(ANCHO_VENTANA - margen - barW, ALTO_VENTANA - 36.f);
-        barLlenaR.setSize({barW, barH});
-        barLlenaR.setPosition(ANCHO_VENTANA - margen - barW, ALTO_VENTANA - 36.f);
-        barLlenaR.setFillColor(sf::Color(80,180,255));
+        fuenteOk = fuente.loadFromFile("assets/front/texto.ttf");
     }
 
-    void mostrarMensaje(const std::string& msg, float duracion = 2.f) {
-        txtMensaje.setString(msg);
-        sf::FloatRect b = txtMensaje.getLocalBounds();
-        txtMensaje.setOrigin(b.width / 2.f, b.height / 2.f);
-        txtMensaje.setPosition(ANCHO_VENTANA / 2.f, ALTO_VENTANA / 2.f - 60.f);
-        tiempoMensaje = duracion;
+    void flash(sf::Color c, float dur = 0.4f) {
+        flashColor = c;
+        flashTimer = dur;
+    }
+
+    void mensaje(const std::string& txt, sf::Color c = sf::Color::Yellow, float dur = 2.2f) {
+        msgTexto = txt;
+        msgColor = c;
+        msgTimer = dur;
     }
 
     void actualizar(float dt) {
-        tiempoMensaje -= dt;
+        if (msgTimer   > 0.f) msgTimer   -= dt;
+        if (flashTimer > 0.f) flashTimer -= dt;
     }
 
     void dibujar(sf::RenderWindow& w,
-                 int puntosL, int puntosR,
-                 float tiempo,
-                 int mitad,
-                 float superL, float superR,
-                 const std::string& nombreL, const std::string& nombreR) {
+                 int ptsH, int ptsCPU,
+                 float tiempo, int mitad,
+                 float superH, float superCPU,
+                 const std::string& nombreH,
+                 const std::string& nombreCPU) {
+
+        // Flash de pantalla al anotar
+        if (flashTimer > 0.f) {
+            sf::RectangleShape fsh({(float)W_ANCHO, (float)W_ALTO});
+            float a = (flashTimer / 0.4f) * 80.f;
+            sf::Color fc = flashColor;
+            fc.a = (sf::Uint8)a;
+            fsh.setFillColor(fc);
+            w.draw(fsh);
+        }
+
+        // Panel HUD superior (semi-transparente)
+        sf::RectangleShape panel({(float)W_ANCHO, C_Y - 2.f});
+        panel.setFillColor(sf::Color(10, 8, 5, 210));
+        w.draw(panel);
+
         // Marcador
-        std::ostringstream ss;
-        ss << nombreL << "  " << puntosL << " : " << puntosR << "  " << nombreR;
-        txtMarcador.setString(ss.str());
-        sf::FloatRect bm = txtMarcador.getLocalBounds();
-        txtMarcador.setOrigin(bm.width / 2.f, 0.f);
-        txtMarcador.setPosition(ANCHO_VENTANA / 2.f, 8.f);
-        w.draw(txtMarcador);
+        auto txt = [&](const std::string& s, int sz, sf::Color c,
+                       float x, float y, bool centrado = true) {
+            sf::Text t;
+            if (fuenteOk) t.setFont(fuente);
+            t.setString(s);
+            t.setCharacterSize(sz);
+            t.setFillColor(c);
+            t.setOutlineThickness(2.f);
+            t.setOutlineColor(sf::Color::Black);
+            sf::FloatRect b = t.getLocalBounds();
+            if (centrado) t.setOrigin(b.width/2.f, b.height/2.f);
+            t.setPosition(x, y);
+            w.draw(t);
+        };
 
-        // Tiempo
-        int min = (int)tiempo / 60;
-        int seg = (int)tiempo % 60;
-        std::ostringstream st;
-        st << std::setfill('0') << std::setw(1) << min << ":"
-           << std::setfill('0') << std::setw(2) << seg;
-        txtTiempo.setString(st.str());
-        sf::FloatRect bt = txtTiempo.getLocalBounds();
-        txtTiempo.setOrigin(bt.width / 2.f, 0.f);
-        txtTiempo.setPosition(ANCHO_VENTANA / 2.f, 44.f);
-        w.draw(txtTiempo);
+        // Nombres equipos
+        txt(nombreH,   18, sf::Color(255,160,60),  160.f, 18.f);
+        txt(nombreCPU, 18, sf::Color(100,180,255), 864.f, 18.f);
 
-        // Mitad
-        txtMitad.setString("Mitad " + std::to_string(mitad));
-        sf::FloatRect bmi = txtMitad.getLocalBounds();
-        txtMitad.setOrigin(bmi.width / 2.f, 0.f);
-        txtMitad.setPosition(ANCHO_VENTANA / 2.f, 68.f);
-        w.draw(txtMitad);
+        // Puntos
+        txt(std::to_string(ptsH),   38, sf::Color::White, 240.f, 44.f);
+        txt("-",                    30, sf::Color(180,180,180), W_ANCHO/2.f, 44.f);
+        txt(std::to_string(ptsCPU), 38, sf::Color::White, 784.f, 44.f);
+
+        // Tiempo y mitad (centro)
+        int mn = (int)tiempo / 60;
+        int sg = (int)tiempo % 60;
+        std::ostringstream oss;
+        oss << mn << ":" << std::setfill('0') << std::setw(2) << sg;
+        txt(oss.str(), 30, sf::Color(255,220,70), W_ANCHO/2.f, 30.f);
+        txt("Mitad " + std::to_string(mitad), 14, sf::Color(180,180,180), W_ANCHO/2.f, 60.f);
 
         // Super meters
-        float barW = 160.f;
-        barLlenaL.setSize({barW * (superL / SUPER_MAX), 14.f});
-        // Color cambia cuando está lleno
-        barLlenaL.setFillColor(superL >= SUPER_MAX
-            ? sf::Color(255, 80, 0) : sf::Color(255, 180, 0));
-        w.draw(barFondoL);
-        if (superL > 0.f) w.draw(barLlenaL);
+        dibujarSuperMeter(w, superH,   20.f,  W_ALTO - 34.f, sf::Color(255,170,0), sf::Color(255,80,0));
+        dibujarSuperMeter(w, superCPU, W_ANCHO - 185.f, W_ALTO - 34.f,
+                          sf::Color(70,170,255), sf::Color(0,210,255));
 
-        barLlenaR.setSize({barW * (superR / SUPER_MAX), 14.f});
-        barLlenaR.setFillColor(superR >= SUPER_MAX
-            ? sf::Color(0, 200, 255) : sf::Color(80, 180, 255));
-        w.draw(barFondoR);
-        if (superR > 0.f) w.draw(barLlenaR);
+        // Etiquetas SUPER
+        txt("SUPER", 13, sf::Color(255,200,0,200),   102.f, W_ALTO - 52.f, false);
+        txt("SUPER", 13, sf::Color(70,200,255,200), W_ANCHO - 185.f, W_ALTO - 52.f, false);
 
-        // Etiquetas super
-        txtSuperEtiqueta.setString("SUPER");
-        txtSuperEtiqueta.setPosition(20.f, ALTO_VENTANA - 52.f);
-        txtSuperEtiqueta.setFillColor(sf::Color(255, 200, 0));
-        w.draw(txtSuperEtiqueta);
-        txtSuperEtiqueta.setPosition(ANCHO_VENTANA - 70.f, ALTO_VENTANA - 52.f);
-        txtSuperEtiqueta.setFillColor(sf::Color(80, 200, 255));
-        w.draw(txtSuperEtiqueta);
+        // Mensaje flash
+        if (msgTimer > 0.f) {
+            float a = std::min(msgTimer, 0.8f) / 0.8f;
+            float sc = 1.f + (1.f - a) * 0.3f;
+            sf::Text t;
+            if (fuenteOk) t.setFont(fuente);
+            t.setString(msgTexto);
+            t.setCharacterSize(44);
+            t.setFillColor(sf::Color(msgColor.r, msgColor.g, msgColor.b, (sf::Uint8)(a*255)));
+            t.setOutlineThickness(3.f);
+            t.setOutlineColor(sf::Color(0,0,0,(sf::Uint8)(a*200)));
+            sf::FloatRect b = t.getLocalBounds();
+            t.setOrigin(b.width/2.f, b.height/2.f);
+            t.setScale(sc, sc);
+            t.setPosition(W_ANCHO/2.f, W_ALTO/2.f - 50.f);
+            w.draw(t);
+        }
 
-        // Mensaje flotante
-        if (tiempoMensaje > 0.f) {
-            float alpha = std::min(tiempoMensaje, 1.f) * 255.f;
-            txtMensaje.setFillColor(sf::Color(255, 80, 80, (sf::Uint8)alpha));
-            w.draw(txtMensaje);
+        // Indicador controles (abajo)
+        sf::RectangleShape panelBot({(float)W_ANCHO, (float)(W_ALTO - C_Y - C_ALTO)});
+        panelBot.setPosition(0, C_Y + C_ALTO);
+        panelBot.setFillColor(sf::Color(10,8,5,210));
+        w.draw(panelBot);
+
+        txt("WASD:Mover  J:Tiro  K:Pase  L:Robo/Bloqueo  J+K:Super Dunk  Tab:Cambiar jugador",
+            11, sf::Color(150,150,150), W_ANCHO/2.f, C_Y + C_ALTO + 10.f);
+    }
+
+private:
+    void dibujarSuperMeter(sf::RenderWindow& w, float val,
+                           float x, float y, sf::Color cLlena, sf::Color cFull) {
+        float bw = 165.f, bh = 14.f;
+        // Fondo
+        sf::RectangleShape bg({bw, bh});
+        bg.setPosition(x, y);
+        bg.setFillColor(sf::Color(30,30,30,190));
+        bg.setOutlineThickness(1.f);
+        bg.setOutlineColor(sf::Color(80,80,80));
+        w.draw(bg);
+        // Llena
+        float fill = bw * (val / SM_MAX);
+        if (fill > 0.f) {
+            sf::RectangleShape llen({fill, bh});
+            llen.setPosition(x, y);
+            bool lleno = val >= SM_MAX;
+            llen.setFillColor(lleno ? cFull : cLlena);
+            if (lleno) {
+                // Efecto pulso (parpadeo simple)
+                static float t = 0.f; t += 0.05f;
+                float alpha = 180.f + std::sin(t * 8.f) * 75.f;
+                sf::Color pul = cFull;
+                pul.a = (sf::Uint8)alpha;
+                llen.setFillColor(pul);
+            }
+            w.draw(llen);
         }
     }
 };

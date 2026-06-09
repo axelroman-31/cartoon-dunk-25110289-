@@ -1,74 +1,72 @@
 #pragma once
+#include <string>
 
-// ============================================================
-//  Cartoon Dunk - Street Hoop estilo 3v3
-//  Constantes globales del juego
-// ============================================================
+// ================================================================
+//  CARTOON DUNK  -  Constantes globales
+//  Inspirado en Street Hoop / Street Slam (Data East, 1994)
+// ================================================================
 
-// Ventana
-static const int ANCHO_VENTANA   = 1024;
-static const int ALTO_VENTANA    = 600;
-static const float FPS_OBJETIVO  = 60.f;
+// --- Ventana ---
+constexpr int   W_ANCHO  = 1024;
+constexpr int   W_ALTO   = 620;
 
-// Cancha
-static const float CANCHA_X      = 60.f;
-static const float CANCHA_Y      = 80.f;
-static const float CANCHA_ANCHO  = ANCHO_VENTANA - 120.f;
-static const float CANCHA_ALTO   = ALTO_VENTANA  - 160.f;
+// --- Cancha (área jugable) ---
+constexpr float C_X      = 55.f;
+constexpr float C_Y      = 90.f;
+constexpr float C_ANCHO  = W_ANCHO - 110.f;
+constexpr float C_ALTO   = W_ALTO  - 155.f;
 
-// Canastas
-static const float CANASTA_RADIO = 28.f;
-static const float ARO_IZQUIERDA_X = CANCHA_X + 5.f;
-static const float ARO_DERECHA_X   = CANCHA_X + CANCHA_ANCHO - 5.f;
-static const float ARO_Y           = CANCHA_Y + CANCHA_ALTO * 0.5f;
+// --- Aros ---
+constexpr float ARO_RADIO   = 26.f;
+constexpr float ARO_IZQ_X   = C_X + 2.f;
+constexpr float ARO_DER_X   = C_X + C_ANCHO - 2.f;
+constexpr float ARO_Y       = C_Y + C_ALTO * 0.5f;
 
-// Linea de 3 puntos: distancia desde cada aro
-static const float DIST_TRES_PUNTOS = 200.f;
+// Centro del aro (donde debe entrar la pelota)
+constexpr float ARO_IZQ_CX  = ARO_IZQ_X + ARO_RADIO + 8.f;
+constexpr float ARO_DER_CX  = ARO_DER_X - ARO_RADIO - 8.f;
 
-// Pelota
-static const float PELOTA_RADIO     = 14.f;
-static const float PELOTA_VELOCIDAD = 200.f;
+// --- Línea de 3 puntos (distancia desde el centro del aro) ---
+constexpr float DIST_3P     = 210.f;
 
-// Jugadores
-static const float JUGADOR_RADIO    = 22.f;
-static const float VELOCIDAD_BASE   = 180.f;
-static const float VELOCIDAD_SPRINT = 270.f;
-static const float RADIO_ROBO       = 50.f;
-static const float RADIO_PASE       = 400.f;
+// --- Pelota ---
+constexpr float P_RADIO     = 13.f;
 
-// Super meter
-static const float SUPER_MAX        = 100.f;
-static const float SUPER_POR_ENCESTE = 20.f;
-static const float SUPER_POR_PASE   = 5.f;
-static const float SUPER_POR_ROBO   = 15.f;
+// --- Jugadores ---
+constexpr float J_RADIO     = 20.f;
+constexpr float VEL_BASE    = 175.f;
+constexpr float VEL_SPRINT  = 265.f;
+constexpr float RADIO_ROBO  = 48.f;
 
-// Tiempo de juego
-static const float TIEMPO_MITAD     = 120.f;   // 2 minutos por mitad
+// --- Super meter ---
+constexpr float SM_MAX          = 100.f;
+constexpr float SM_POR_ENCESTE  = 22.f;
+constexpr float SM_POR_PASE     = 6.f;
+constexpr float SM_POR_ROBO     = 18.f;
 
-// Atributos de equipo (escala 1-9 como en el original)
-struct AtributosEquipo {
-    std::string nombre;
-    int dunk;     // 1-9
-    int tresP;    // 1-9
-    int velocidad;// 1-9
-    int defensa;  // 1-9
-};
+// --- Tiempo ---
+constexpr float TIEMPO_MITAD = 120.f;   // 2 minutos
 
-// Nombres de equipos / personajes
-enum class Equipo { CARTOON_DUNK, RIVAL };
+// --- Equipos disponibles ---
+enum class IDEquipo { CARTOON, RIVALES };
+
+// --- Estados del juego ---
 enum class EstadoJuego {
-    MENU,
-    SELECCION_EQUIPO,
+    SELECCION,
     JUGANDO,
     MEDIO_TIEMPO,
-    FIN_JUEGO
+    FIN
 };
-enum class EstadoJugador {
+
+// --- Estados de un jugador ---
+enum class EstadoJ {
     IDLE,
     CORRIENDO,
-    SALTANDO,
-    LANZANDO,
+    LANZANDO,       // tiro normal / en arco
+    EN_AIRE,        // saltó para dunk (A+B luego A)
+    DUNKEANDO,      // ejecutando el dunk
     PASANDO,
     BLOQUEANDO,
+    ROBANDO,
     SUPER_SHOT
 };
