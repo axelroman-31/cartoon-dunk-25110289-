@@ -33,19 +33,22 @@ constexpr float DIST_3P     = 210.f;
 constexpr float P_RADIO     = 13.f;
 
 // --- Jugadores ---
-constexpr float J_RADIO     = 20.f;
-constexpr float VEL_BASE    = 175.f;
-constexpr float VEL_SPRINT  = 265.f;
-constexpr float RADIO_ROBO  = 48.f;
+constexpr float J_RADIO      = 20.f;
+constexpr float VEL_BASE     = 175.f;
+constexpr float VEL_SPRINT   = 265.f;
+constexpr float RADIO_ROBO   = 48.f;
+constexpr float RADIO_BLOQUEO = 55.f;   // rango para bloquear un tiro
 
 // --- Super meter ---
-constexpr float SM_MAX          = 100.f;
-constexpr float SM_POR_ENCESTE  = 22.f;
-constexpr float SM_POR_PASE     = 6.f;
-constexpr float SM_POR_ROBO     = 18.f;
+constexpr float SM_MAX              = 100.f;
+constexpr float SM_POR_ENCESTE      = 22.f;
+constexpr float SM_POR_PASE         = 6.f;
+constexpr float SM_POR_ROBO         = 18.f;
+constexpr float SM_POR_ALLEYOOP     = 30.f;   // alley-oop premia mucho
+constexpr float SM_TIEMPO_REGEN     = 4.5f;   // +1 por cada 4.5s (igual que original)
 
 // --- Tiempo ---
-constexpr float TIEMPO_MITAD = 120.f;   // 2 minutos
+constexpr float TIEMPO_MITAD = 120.f;   // 2 minutos por mitad (original)
 
 // --- Equipos disponibles ---
 enum class IDEquipo { CARTOON, RIVALES };
@@ -62,11 +65,17 @@ enum class EstadoJuego {
 enum class EstadoJ {
     IDLE,
     CORRIENDO,
-    LANZANDO,       // tiro normal / en arco
-    EN_AIRE,        // saltó para dunk (A+B luego A)
-    DUNKEANDO,      // ejecutando el dunk
+    LANZANDO,        // tiro normal / en arco
+    EN_AIRE,         // saltó para dunk (A+B luego A)
+    DUNKEANDO,       // ejecutando el dunk
     PASANDO,
-    BLOQUEANDO,
+    BLOQUEANDO,      // salta para bloquear tiro rival
     ROBANDO,
-    SUPER_SHOT
+    SUPER_SHOT,
+    // Nuevos estados para mecánicas de Street Hoop
+    FINTANDO,        // finta: amaga tiro sin soltar la pelota
+    ALLEYOOP_VUELO,  // receptor en el aire esperando alley-oop
+    REBOTEANDO,      // disputa de rebote tras fallo
+    EMPUJANDO,       // choque físico con rival (shoving)
+    ATURDIDO         // tras recibir empujón fuerte
 };

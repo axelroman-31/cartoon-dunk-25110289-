@@ -120,22 +120,18 @@ class Marcador {
 }
 class Capitán
 class JugadorEstrella
-
 class PowerUp
 class AumentoVelocidad
 class AumentoFuerza
 class AumentoDefensa
 class BalónDePoder
-
 class Canasta
 class CanastaDosPuntos
 class CanastaTres
 class TiroLibre
-
 class Marcador
 class Cronometro
 class Faltas
-
 class Pelota
 class Accion
 
@@ -184,5 +180,6 @@ JuegoStreetHoop "1" *-- "1" Marcador : gestiona >
 JuegoStreetHoop "1" *-- "1" Canasta : incluye >
 
 Capitán "1" o-- "1" Bandera
+
 
 @enduml

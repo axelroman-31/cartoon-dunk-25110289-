@@ -3,6 +3,7 @@
 #include <array>
 #include <string>
 #include <algorithm>
+#include <cmath>
 #include "Constantes.hpp"
 #include "Jugador.hpp"
 
@@ -13,7 +14,7 @@ struct DatosEquipo {
     std::string nombre;
     std::string sprites[3];
     sf::Color   color;
-    int dunk, tres, vel, def;  // stats globales del equipo
+    int dunk, tres, vel, def;
 };
 
 // ================================================================
@@ -28,24 +29,30 @@ public:
 
     int   puntos      = 0;
     float superMeter  = 0.f;
+    float superRegenTimer = 0.f;   // para la regeneración por tiempo
 
-    // Quién controla el humano / quién ataca en CPU
     int   activo      = 0;
-    // Índice del receptor de pase pendiente
     int   receptorPase = -1;
+    int   receptorAlleyOop = -1;   // para alley-oops
+
+    // Estadísticas de partido
+    int   asistencias  = 0;
+    int   robos        = 0;
+    int   bloqueos     = 0;
+    int   alleyOops    = 0;
 
     void configurar(const DatosEquipo& d, bool humano) {
         nombre   = d.nombre;
         color    = d.color;
         esHumano = humano;
         for (int i = 0; i < 3; i++) {
-            j[i].nombre     = d.sprites[i];
+            j[i].nombre      = d.sprites[i];
             j[i].colorEquipo = d.color;
-            j[i].aDunk      = d.dunk;
-            j[i].aTres      = d.tres;
-            j[i].aVel       = d.vel;
-            j[i].aDef       = d.def;
-            j[i].esHumano   = humano;
+            j[i].aDunk       = d.dunk;
+            j[i].aTres       = d.tres;
+            j[i].aVel        = d.vel;
+            j[i].aDef        = d.def;
+            j[i].esHumano    = humano;
             if (!d.sprites[i].empty()) j[i].cargarSprite(d.sprites[i]);
         }
         activo = 0;
@@ -70,7 +77,6 @@ public:
         activo = idx;
     }
 
-    // Cambiar automáticamente al jugador más cercano a un punto
     void autoSwitch(sf::Vector2f punto) {
         int   mejor  = 0;
         float minD   = 1e9f;
@@ -81,7 +87,20 @@ public:
             if (d < minD) { minD = d; mejor = i; }
         }
         activo = mejor;
-        j[activo].esHumano = esHumano;
+    }
+
+    // Jugador más libre cerca del aro rival (para alley-oops)
+    int mejorReceptorAlleyOop(sf::Vector2f aroPos) const {
+        int   mejor = -1;
+        float minD  = 200.f;  // solo si está cerca del aro
+        for (int i = 0; i < 3; i++) {
+            if (j[i].tienePelota) continue;
+            float dx = j[i].pos.x - aroPos.x;
+            float dy = j[i].pos.y - aroPos.y;
+            float d  = std::sqrt(dx*dx+dy*dy);
+            if (d < minD) { minD = d; mejor = i; }
+        }
+        return mejor;
     }
 
     void sumarPuntos(int pts) {
@@ -89,15 +108,26 @@ public:
         float gain = (pts == 3) ? SM_POR_ENCESTE * 1.5f : SM_POR_ENCESTE;
         superMeter = std::min(SM_MAX, superMeter + gain);
     }
-    void sumarSuperPase() { superMeter = std::min(SM_MAX, superMeter + SM_POR_PASE); }
-    void sumarSuperRobo() { superMeter = std::min(SM_MAX, superMeter + SM_POR_ROBO); }
+    void sumarSuperPase()       { superMeter = std::min(SM_MAX, superMeter + SM_POR_PASE);     asistencias++; }
+    void sumarSuperRobo()       { superMeter = std::min(SM_MAX, superMeter + SM_POR_ROBO);     robos++;       }
+    void sumarSuperBloqueo()    { superMeter = std::min(SM_MAX, superMeter + SM_POR_ROBO);     bloqueos++;    }
+    void sumarSuperAlleyOop()   { superMeter = std::min(SM_MAX, superMeter + SM_POR_ALLEYOOP); alleyOops++;   }
+
     bool superLleno() const { return superMeter >= SM_MAX; }
     void gastarSuper()      { superMeter = 0.f; }
 
-    void actualizar(float dt) { for (auto& jj : j) jj.actualizar(dt); }
+    // Regeneración del super con el tiempo (como en el original)
+    void actualizar(float dt) {
+        for (auto& jj : j) jj.actualizar(dt);
 
-    // Ordenar para dibujado en Y
+        superRegenTimer += dt;
+        if (superRegenTimer >= SM_TIEMPO_REGEN) {
+            superRegenTimer = 0.f;
+            superMeter = std::min(SM_MAX, superMeter + 1.f);
+        }
+    }
+
     void dibujar(sf::RenderWindow& w) {
-        // Se dibuja desde GameManager ordenando todos los jugadores por Y
+        (void)w; // Se dibuja desde GameManager por orden Y
     }
 };
