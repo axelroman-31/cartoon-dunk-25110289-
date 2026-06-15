@@ -5,8 +5,7 @@
 # ================================================================
 CXX      = g++
 CXXFLAGS = -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -Iinclude
-LIBS     = -lsfml-graphics -lsfml-window -lsfml-system -lsfml-audio
-TARGET   = CartoonDunk
+LIBS      = -lmingw32 -lsfml-graphics -lsfml-window -lsfml-system -lsfml-audioTARGET   = CartoonDunk
 
 all: $(TARGET)
 
