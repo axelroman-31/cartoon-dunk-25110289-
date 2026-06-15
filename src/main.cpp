@@ -1,21 +1,6 @@
 // ================================================================
-//  CARTOON DUNK
-//  Baloncesto 3v3 estilo arcade - inspirado en Street Hoop (1994)
-//  Motor: SFML 2.6
-//
-//  Mecánicas implementadas (basadas en el original):
-//   - Tiro 2pts / 3pts con probabilidad por atributo
-//   - Pase (rápido, interceptable por rivales)
-//   - Dunk en el aire (A+B -> A) con arco alto
-//   - Super Shot (meter lleno -> dunk de 10 metros)
-//   - Alley-oop (pase en vuelo a compañero cerca del aro)
-//   - Bloqueo de tiro (salta y corta el arco)
-//   - Intercepción de pase (rival corta en vuelo)
-//   - Finta (amaga tiro, engaña a la defensa)
-//   - Empuje / shoving estilo calle
-//   - Rebote de tablero tras fallo
-//   - Super meter regenera con el tiempo + acciones
-//   - IA defensiva mejorada con bloqueos e interceptaciones
+//   CARTOON DUNK  -  Street Hoop Style
+//   SFML 2.6  |  C++17  |  Código Corregido y Optimizado
 // ================================================================
 #include <SFML/Graphics.hpp>
 #include <SFML/Audio.hpp>
@@ -26,7 +11,8 @@
 #include <ctime>
 #include <string>
 #include <sstream>
-#include <functional>
+#include <array>
+#include <memory> 
 
 #include "Constantes.hpp"
 #include "Pelota.hpp"
@@ -35,9 +21,21 @@
 #include "Cancha.hpp"
 #include "HUD.hpp"
 
-// ────────────────────────────────────────────
-//  Helpers matemáticos
-// ────────────────────────────────────────────
+// ─────────────────────────────────────────
+//   Enum de pantallas
+// ─────────────────────────────────────────
+enum class Pantalla {
+    INTRO,
+    MENU,
+    SELECCION,
+    JUGANDO,
+    MEDIO_TIEMPO,
+    FIN
+};
+
+// ─────────────────────────────────────────
+//   Helpers matemáticos
+// ─────────────────────────────────────────
 static float dist2(sf::Vector2f a, sf::Vector2f b) {
     float dx = a.x - b.x, dy = a.y - b.y;
     return std::sqrt(dx*dx + dy*dy);
@@ -46,79 +44,485 @@ static sf::Vector2f norm2(sf::Vector2f v) {
     float l = std::sqrt(v.x*v.x + v.y*v.y);
     return l < 0.001f ? sf::Vector2f{} : sf::Vector2f{v.x/l, v.y/l};
 }
-static bool prob(float p) {
-    return ((float)rand()/RAND_MAX) < p;
-}
+static bool prob(float p) { return ((float)rand()/RAND_MAX) < p; }
 
-// ────────────────────────────────────────────
-//  Definición de equipos
-// ────────────────────────────────────────────
+// ─────────────────────────────────────────
+//   Datos de equipos
+// ─────────────────────────────────────────
 static DatosEquipo equipoCartoon() {
     DatosEquipo d;
-    d.nombre = "CARTOON";
-    d.sprites[0] = "assets/imagenes/goku.png";
-    d.sprites[1] = "assets/imagenes/Pocoyo.png";
-    d.sprites[2] = "assets/imagenes/bugs bunny.png";
-    d.color  = sf::Color(255, 120, 0);
+    d.nombre    = "CARTOON";
+    d.sprites[0]= "assets/imagenes/goku.png";
+    d.sprites[1]= "assets/imagenes/Pocoyo.png";
+    d.sprites[2]= "assets/imagenes/goku.png"; 
+    d.color     = sf::Color(255, 120, 0);
     d.dunk = 8; d.tres = 6; d.vel = 7; d.def = 5;
     return d;
 }
 static DatosEquipo equipoRival() {
     DatosEquipo d;
-    d.nombre = "RIVALES";
-    d.sprites[0] = "assets/imagenes/mistico.png";
-    d.sprites[1] = "assets/imagenes/mistico.png";
-    d.sprites[2] = "assets/imagenes/mistico.png";
-    d.color  = sf::Color(80, 160, 255);
+    d.nombre    = "RIVALES";
+    d.sprites[0]= "assets/imagenes/mistico.png";
+    d.sprites[1]= "assets/imagenes/mistico.png";
+    d.sprites[2]= "assets/imagenes/mistico.png";
+    d.color     = sf::Color(80, 160, 255);
     d.dunk = 6; d.tres = 8; d.vel = 6; d.def = 8;
     return d;
 }
 
-// ────────────────────────────────────────────
-//  GameManager
-// ────────────────────────────────────────────
+// ================================================================
+//   PANTALLA DE INTRO
+// ================================================================
+class PantallaIntro {
+public:
+    sf::Sprite sprFondo, sprGokuArt, sprMisticoArt, sprPocoyoArt;
+    
+    struct Part { float x, y, vel, tam, alfa; sf::Color col; };
+    std::vector<Part> partes;
+
+    float tTotal=0, parpadeo=0, escLogo=0, alfaFondo=0, alfaPerso=0, ondaY=0;
+    sf::Font& F; bool Fok;
+
+    // Las texturas ahora se reciben por referencia desde el GameManager para evitar tirones
+    PantallaIntro(sf::Font& f, bool fok, const sf::Texture& tFondo, const sf::Texture& tGoku, const sf::Texture& tMistico, const sf::Texture& tPocoyo) 
+        : F(f), Fok(fok) {
+        
+        sprFondo.setTexture(tFondo);
+        float sx = (float)W_ANCHO / tFondo.getSize().x;
+        float sy = (float)W_ALTO  / tFondo.getSize().y;
+        sprFondo.setScale(std::max(sx,sy), std::max(sx,sy));
+        sprFondo.setColor(sf::Color(255,255,255,0));
+
+        auto setupSprite = [](sf::Sprite& s, const sf::Texture& t, float h, float x, float y) {
+            s.setTexture(t);
+            float sc = h / t.getSize().y;
+            s.setScale(sc, sc);
+            s.setPosition(x, y);
+            s.setColor(sf::Color(255,255,255,0));
+        };
+
+        setupSprite(sprGokuArt,   tGoku,   210.f, 30.f,  (float)W_ALTO - 220.f);
+        setupSprite(sprPocoyoArt, tPocoyo, 130.f, 200.f, (float)W_ALTO - 145.f);
+
+        sprMisticoArt.setTexture(tMistico);
+        float sc = 210.f / tMistico.getSize().y;
+        sprMisticoArt.setScale(sc, sc);
+        float pw = tMistico.getSize().x * sc;
+        sprMisticoArt.setPosition((float)W_ANCHO - pw - 30.f, (float)W_ALTO - 220.f);
+        sprMisticoArt.setColor(sf::Color(255,255,255,0));
+
+        for (int i = 0; i < 60; i++) {
+            Part p;
+            p.x   = (float)(rand() % W_ANCHO);
+            p.y   = (float)(rand() % W_ALTO);
+            p.vel = 18.f + (rand() % 40);
+            p.tam = 2.f  + (rand() % 4);
+            p.alfa = 0.f;
+            int c = rand() % 4;
+            if      (c == 0) p.col = sf::Color(255, 200, 20);
+            else if (c == 1) p.col = sf::Color(80,  200, 255);
+            else if (c == 2) p.col = sf::Color(255, 60,  120);
+            else             p.col = sf::Color(120, 255, 100);
+            partes.push_back(p);
+        }
+    }
+
+    void actualizar(float dt) {
+        tTotal  += dt;
+        ondaY    = std::sin(tTotal * 1.8f) * 6.f;
+        parpadeo += dt * 2.8f;
+        alfaFondo  = std::min(alfaFondo  + dt * 140.f, 200.f);
+        if (tTotal > 0.3f) escLogo  = std::min(escLogo  + dt * 2.2f, 1.f);
+        if (tTotal > 0.7f) alfaPerso = std::min(alfaPerso + dt * 200.f, 255.f);
+
+        sprFondo.setColor(sf::Color(255,255,255,(sf::Uint8)alfaFondo));
+
+        sf::Uint8 ap = (sf::Uint8)alfaPerso;
+        sprGokuArt.setPosition(30.f, (float)W_ALTO - 220.f + ondaY * 0.6f);
+        sprGokuArt.setColor({255,255,255,ap});
+        
+        float pw = sprMisticoArt.getTexture()->getSize().x * sprMisticoArt.getScale().x;
+        sprMisticoArt.setPosition((float)W_ANCHO - pw - 30.f, (float)W_ALTO - 220.f - ondaY * 0.6f);
+        sprMisticoArt.setColor({255,255,255,ap});
+        
+        sprPocoyoArt.setPosition(200.f, (float)W_ALTO - 145.f + ondaY * 0.4f);
+        sprPocoyoArt.setColor({255,255,255,ap});
+
+        for (auto& p : partes) {
+            p.y   -= p.vel * dt;
+            p.alfa = std::min(p.alfa + dt * 120.f, 180.f);
+            if (p.y < -10.f) {
+                p.y   = (float)W_ALTO + 5.f;
+                p.x   = (float)(rand() % W_ANCHO);
+                p.alfa = 0.f;
+            }
+        }
+    }
+
+    void dibujar(sf::RenderWindow& w) {
+        sf::RectangleShape bg({(float)W_ANCHO,(float)W_ALTO});
+        bg.setFillColor(sf::Color(8, 4, 18));
+        w.draw(bg);
+
+        w.draw(sprFondo);
+
+        sf::RectangleShape ov({(float)W_ANCHO,(float)W_ALTO});
+        ov.setFillColor(sf::Color(0,0,0,110));
+        w.draw(ov);
+
+        for (auto& p : partes) {
+            sf::CircleShape c(p.tam);
+            c.setPosition(p.x, p.y);
+            sf::Color col = p.col; col.a = (sf::Uint8)p.alfa;
+            c.setFillColor(col);
+            w.draw(c);
+        }
+
+        w.draw(sprGokuArt);
+        w.draw(sprMisticoArt);
+        w.draw(sprPocoyoArt);
+
+        if (escLogo > 0.01f) {
+            dtxt(w, "CARTOON DUNK", 68, sf::Color(180, 80, 0, (sf::Uint8)(200*escLogo)), (float)W_ANCHO/2.f + 4.f, 84.f, escLogo);
+            dtxt(w, "CARTOON DUNK", 68, sf::Color(255, 220, 40, (sf::Uint8)(255*escLogo)), (float)W_ANCHO/2.f, 80.f, escLogo);
+            dtxt(w, "Street Basketball 3v3", 22, sf::Color(200, 200, 200, (sf::Uint8)(220*escLogo)), (float)W_ANCHO/2.f, 160.f, std::min(escLogo*1.3f, 1.f));
+
+            if (escLogo >= 0.9f) {
+                float lw = 380.f * escLogo;
+                sf::RectangleShape ln({lw, 2.f});
+                ln.setFillColor(sf::Color(255,180,0,160));
+                ln.setOrigin(lw/2.f, 1.f);
+                ln.setPosition((float)W_ANCHO/2.f, 178.f);
+                w.draw(ln);
+                dtxt(w, "Inspirado en Street Slam | Data East 1994", 14, sf::Color(140,140,170,180), (float)W_ANCHO/2.f, 192.f, 1.f);
+            }
+        }
+
+        if (tTotal > 1.2f) {
+            float a = std::sin(parpadeo) * 0.5f + 0.5f;
+            dtxt(w, "PRESIONA  ENTER  PARA  COMENZAR", 20, sf::Color(255, 240, 100, (sf::Uint8)(220*a)), (float)W_ANCHO/2.f, (float)W_ALTO - 52.f, 1.f);
+        }
+
+        if (escLogo >= 0.9f) {
+            dtxt(w, "WASD:Mover  J:Tiro  K:Pase  J+K:Dunk  L:Finta/Robo  Tab:Cambiar jugador", 11, sf::Color(110,110,120,150), (float)W_ANCHO/2.f, (float)W_ALTO - 20.f, 1.f);
+        }
+    }
+
+private:
+    void dtxt(sf::RenderWindow& w, const std::string& s, int sz, sf::Color c, float x, float y, float esc) {
+        sf::Text t;
+        if (Fok) t.setFont(F);
+        t.setString(s);
+        t.setCharacterSize(sz);
+        t.setFillColor(c);
+        t.setOutlineThickness(2.5f);
+        t.setOutlineColor(sf::Color(0, 0, 0, (sf::Uint8)(c.a * 0.7f)));
+        sf::FloatRect b = t.getLocalBounds();
+        t.setOrigin(b.width/2.f, b.height/2.f);
+        t.setScale(esc, esc);
+        t.setPosition(x, y);
+        w.draw(t);
+    }
+};
+
+// ================================================================
+//   PANTALLA DE MENÚ PRINCIPAL
+// ================================================================
+class MenuPrincipal {
+public:
+    sf::Sprite  sprG, sprP, sprM, sprF;
+
+    struct Opcion { std::string txt, desc; sf::Color cn, cs; };
+    std::vector<Opcion> ops = {
+        {"JUGAR",      "Elige tu equipo e inicia la partida",   {200,200,200},{255,220,50}},
+        {"COMO JUGAR", "Ver controles y mecanicas del juego",   {200,200,200},{100,220,255}},
+        {"CREDITOS",   "Acerca de Cartoon Dunk",                {200,200,200},{180,255,120}},
+        {"SALIR",      "Cerrar el juego",                       {200,200,200},{255,90,90}}
+    };
+    int sel = 0;
+
+    enum class Sub { NINGUNA, CTRL, CRED } sub = Sub::NINGUNA;
+    float t=0, alfaE=0, ondaY=0;
+
+    struct Bola { float x, y, vel, r, alfa; };
+    std::vector<Bola> bolas;
+
+    sf::Font& F; bool Fok;
+
+    MenuPrincipal(sf::Font& f, bool fok, const sf::Texture& tFondo, const sf::Texture& tGoku, const sf::Texture& tMistico, const sf::Texture& tPocoyo) 
+        : F(f), Fok(fok) {
+        
+        sprF.setTexture(tFondo);
+        float sx=(float)W_ANCHO/tFondo.getSize().x, sy=(float)W_ALTO/tFondo.getSize().y;
+        sprF.setScale(std::max(sx,sy), std::max(sx,sy));
+        sprF.setColor(sf::Color(255,255,255,55));
+        
+        auto ss = [](sf::Sprite& s, const sf::Texture& tx, float h, float x, float y) {
+            s.setTexture(tx);
+            float sc = h / tx.getSize().y;
+            s.setScale(sc, sc);
+            s.setPosition(x, y);
+        };
+        
+        ss(sprG, tGoku, 260.f, 30.f, (float)W_ALTO - 270.f);
+        ss(sprP, tPocoyo, 140.f, 260.f, (float)W_ALTO - 155.f);
+        
+        ss(sprM, tMistico, 200.f, 0.f, 0.f);
+        float pw = tMistico.getSize().x * sprM.getScale().x;
+        sprM.setPosition((float)W_ANCHO - pw - 220.f, (float)W_ALTO - 210.f);
+
+        for (int i = 0; i < 18; i++) {
+            Bola b;
+            b.x   = (float)(rand() % W_ANCHO);
+            b.y   = (float)(rand() % W_ALTO);
+            b.vel = 12.f + (rand() % 25);
+            b.r   = 4.f  + (rand() % 8);
+            b.alfa = 0.f;
+            bolas.push_back(b);
+        }
+    }
+
+    void resetear() { alfaE = 0.f; sel = 0; sub = Sub::NINGUNA; }
+
+    void actualizar(float dt) {
+        t += dt;
+        ondaY = std::sin(t * 1.4f) * 7.f;
+        alfaE = std::min(alfaE + dt * 280.f, 255.f);
+
+        sprG.setPosition(30.f, (float)W_ALTO - 270.f + ondaY * 0.7f);
+        sprP.setPosition(260.f, (float)W_ALTO - 155.f + ondaY);
+        
+        float pw = sprM.getTexture()->getSize().x * sprM.getScale().x;
+        sprM.setPosition((float)W_ANCHO - pw - 220.f, (float)W_ALTO - 210.f + ondaY*0.8f); 
+
+        for (auto& b : bolas) {
+            b.y   -= b.vel * dt;
+            b.alfa = std::min(b.alfa + dt * 80.f, 70.f);
+            if (b.y < -20.f) { b.y = (float)W_ALTO + 10.f; b.x = (float)(rand() % W_ANCHO); b.alfa = 0.f; }
+        }
+    }
+
+    bool procesarTecla(sf::Keyboard::Key k) {
+        if (sub != Sub::NINGUNA) {
+            if (k == sf::Keyboard::Escape || k == sf::Keyboard::Return || k == sf::Keyboard::BackSpace)
+                sub = Sub::NINGUNA;
+            return false;
+        }
+        if (k == sf::Keyboard::Up   || k == sf::Keyboard::W) sel = (sel - 1 + 4) % 4;
+        if (k == sf::Keyboard::Down || k == sf::Keyboard::S) sel = (sel + 1) % 4;
+        if (k == sf::Keyboard::Return || k == sf::Keyboard::Space) {
+            if (sel == 0) return true;
+            if (sel == 1) sub = Sub::CTRL;
+            if (sel == 2) sub = Sub::CRED;
+        }
+        return false;
+    }
+
+    bool quiereSalir(sf::Keyboard::Key k) {
+        return sel == 3 && sub == Sub::NINGUNA && (k == sf::Keyboard::Return || k == sf::Keyboard::Space);
+    }
+
+    void dibujar(sf::RenderWindow& w) {
+        sf::RectangleShape bg({(float)W_ANCHO,(float)W_ALTO});
+        bg.setFillColor(sf::Color(6,4,16));
+        w.draw(bg);
+
+        w.draw(sprF);
+
+        sf::RectangleShape piz({420.f,(float)W_ALTO});
+        piz.setFillColor(sf::Color(0,0,0,145));
+        w.draw(piz);
+
+        for (auto& b : bolas) {
+            sf::CircleShape c(b.r);
+            c.setPosition(b.x - b.r, b.y - b.r);
+            c.setFillColor(sf::Color(255, 140, 20, (sf::Uint8)b.alfa));
+            w.draw(c);
+        }
+
+        w.draw(sprG);
+        w.draw(sprP);
+        w.draw(sprM);
+
+        sf::Uint8 ae = (sf::Uint8)alfaE;
+        tx(w, "CARTOON DUNK",        46, sf::Color(255,215,30,ae),           210.f, 65.f);
+        tx(w, "Street Basketball 3v3",18, sf::Color(180,180,200,(sf::Uint8)(ae*0.8f)), 210.f,118.f);
+
+        sf::RectangleShape sep({330.f, 2.f});
+        sep.setOrigin(165.f, 1.f);
+        sep.setPosition(210.f, 140.f);
+        sep.setFillColor(sf::Color(255,180,0,(sf::Uint8)(ae*0.5f)));
+        w.draw(sep);
+
+        float yB = 182.f, paso = 68.f;
+        for (int i = 0; i < 4; i++) {
+            bool s = (i == sel);
+            float yO = yB + i * paso;
+            if (s) {
+                float pu = std::sin(t * 4.f) * 0.04f + 1.f;
+                sf::RectangleShape bx({310.f * pu, 50.f});
+                bx.setOrigin(310.f*pu/2.f, 25.f);
+                bx.setPosition(210.f, yO + 8.f);
+                sf::Color cf = ops[i].cs; cf.a = (sf::Uint8)(ae * 0.18f);
+                bx.setFillColor(cf);
+                bx.setOutlineThickness(2.f);
+                sf::Color cb = ops[i].cs; cb.a = (sf::Uint8)(ae * 0.7f);
+                bx.setOutlineColor(cb);
+                w.draw(bx);
+                tx(w, ">>", 22, sf::Color(ops[i].cs.r, ops[i].cs.g, ops[i].cs.b, ae), 60.f, yO + 3.f);
+                tx(w, ops[i].desc, 13, sf::Color(180,180,180,(sf::Uint8)(ae*0.85f)), 210.f, yB + 4*paso + 14.f);
+            }
+            sf::Color col = s ? ops[i].cs : ops[i].cn;
+            col.a = ae;
+            tx(w, ops[i].txt, s ? 30 : 26, col, 210.f, yO);
+        }
+
+        tx(w, "W/S:Navegar    ENTER:Seleccionar    ESC:Volver", 11, sf::Color(100,100,120,(sf::Uint8)(ae*0.7f)), 210.f, (float)W_ALTO - 22.f);
+
+        if (sub == Sub::CTRL) dibujarCtrl(w);
+        if (sub == Sub::CRED) dibujarCred(w);
+    }
+
+private:
+    void tx(sf::RenderWindow& w, const std::string& s, int sz, sf::Color c, float x, float y) {
+        sf::Text t;
+        if (Fok) t.setFont(F);
+        t.setString(s);
+        t.setCharacterSize(sz);
+        t.setFillColor(c);
+        t.setOutlineThickness(2.f);
+        t.setOutlineColor(sf::Color(0,0,0,(sf::Uint8)(c.a*0.6f)));
+        sf::FloatRect b = t.getLocalBounds();
+        t.setOrigin(b.width/2.f, b.height/2.f);
+        t.setPosition(x, y);
+        w.draw(t);
+    }
+
+    void panel(sf::RenderWindow& w, sf::Color borde) {
+        sf::RectangleShape p({(float)W_ANCHO - 120.f, (float)W_ALTO - 80.f});
+        p.setPosition(60.f, 40.f);
+        p.setFillColor(sf::Color(8, 5, 20, 232));
+        p.setOutlineThickness(3.f);
+        p.setOutlineColor(borde);
+        w.draw(p);
+    }
+
+    void linTxt(sf::RenderWindow& w, const std::string& key, const std::string& accion, float& y) {
+        sf::Text tk, ta;
+        if (Fok) { tk.setFont(F); ta.setFont(F); }
+        tk.setString(key);    tk.setCharacterSize(13); tk.setFillColor(sf::Color(150,220,255)); tk.setPosition(155.f, y); w.draw(tk);
+        ta.setString(accion); ta.setCharacterSize(13); ta.setFillColor(sf::Color(210,210,210)); ta.setPosition(520.f, y); w.draw(ta);
+        y += 18.f;
+    }
+
+    void dibujarCtrl(sf::RenderWindow& w) {
+        panel(w, sf::Color(100,200,255,200));
+        tx(w, "COMO JUGAR", 36, sf::Color(100,220,255), (float)W_ANCHO/2.f, 82.f);
+
+        struct Seccion { std::string titulo; std::vector<std::pair<std::string,std::string>> lineas; };
+        std::vector<Seccion> secs = {
+            {"MOVIMIENTO", {
+                {"W / A / S / D",  "Mover al jugador activo"},
+                {"LShift",         "Sprint (corre mas rapido)"},
+                {"Tab",            "Cambiar jugador activo"}
+            }},
+            {"OFENSIVA (con balon)", {
+                {"J",              "Tiro normal (2 o 3 pts segun distancia)"},
+                {"K",              "Pasar al companero mas libre"},
+                {"J + K",          "Saltar para dunk (combo del original)"},
+                {"J (en el aire)", "Ejecutar el dunk"},
+                {"L",              "Finta: amaga tiro sin soltar la pelota"},
+                {"Super lleno+J",  "Super Shot garantizado"}
+            }},
+            {"DEFENSIVA (sin balon)", {
+                {"J",              "Bloquear tiro rival / Empujar rival"},
+                {"K",              "Intentar robo de balon"},
+                {"L",              "Empuje directo"},
+                {"J + K (sin bal)","Alley-oop: salta esperando el pase"}
+            }},
+            {"SUPER METER", {
+                {"Se llena con:",  "Encestes, pases, robos, bloqueos, alley-oops"},
+                {"Al llenarse:",   "El proximo tiro es un Super Shot espectacular"}
+            }}
+        };
+
+        float y = 120.f;
+        for (auto& sec : secs) {
+            sf::Text ts; if (Fok) ts.setFont(F);
+            ts.setString(sec.titulo); ts.setCharacterSize(15);
+            ts.setFillColor(sf::Color(255,200,50)); ts.setPosition(140.f, y);
+            w.draw(ts); y += 22.f;
+            for (auto& l : sec.lineas) { linTxt(w, l.first, l.second, y); }
+            y += 8.f;
+        }
+        tx(w, "ENTER / ESC para volver", 15, sf::Color(150,150,160), (float)W_ANCHO/2.f, (float)W_ALTO - 50.f);
+    }
+
+    void dibujarCred(sf::RenderWindow& w) {
+        panel(w, sf::Color(180,255,120,200));
+        tx(w, "CREDITOS", 36, sf::Color(180,255,120), (float)W_ANCHO/2.f, 95.f);
+
+        struct C { std::string r, n; };
+        std::vector<C> cs = {
+            {"JUEGO",       "Cartoon Dunk"},
+            {"INSPIRADO EN","Street Slam / Street Hoop (Data East, 1994)"},
+            {"MOTOR",       "SFML 2.6  |  C++17"},
+            {"",""},
+            {"PERSONAJES",  "Goku  |  Pocoyo  |  Mistico"},
+            {"MUSICA",      "Gang$tazz.ogg"},
+            {"FUENTE",      "texto.ttf"},
+            {"",""},
+            {"MECANICAS",   "Tiro 2/3 pts  |  Dunk en Aire  |  Super Shot"},
+            {"",            "Alley-Oop  |  Finta  |  Bloqueo  |  Intercepcion  |  Empuje"},
+            {"",""},
+            {"EQUIPOS",     "Cartoon (Goku/Pocoyo)  vs  Rivales (Mistico)"},
+            {"MODO",        "1 Jugador vs CPU  |  3v3  |  2 mitades de 2 minutos"}
+        };
+        float y = 148.f;
+        for (auto& c : cs) {
+            if (c.r.empty() && c.n.empty()) { y += 8.f; continue; }
+            sf::Text tr, tn;
+            if (Fok) { tr.setFont(F); tn.setFont(F); }
+            tr.setString(c.r); tr.setCharacterSize(13); tr.setFillColor(sf::Color(255,200,60)); tr.setPosition(120.f, y); w.draw(tr);
+            tn.setString(c.n); tn.setCharacterSize(13); tn.setFillColor(sf::Color(210,215,225)); tn.setPosition(340.f, y); w.draw(tn);
+            y += 20.f;
+        }
+        tx(w, "ENTER / ESC para volver", 15, sf::Color(150,150,160), (float)W_ANCHO/2.f, (float)W_ALTO - 55.f);
+    }
+};
+
+// ================================================================
+//   GameManager
+// ================================================================
 class GameManager {
+private:
     sf::RenderWindow ventana;
+    sf::Font  fuente; bool fuenteOk = false;
+
+    // Almacenamiento centralizado de Texturas para evitar errores de ruta en cascada
+    sf::Texture tFondo, tGoku, tMistico, tPocoyo;
+
+    std::unique_ptr<PantallaIntro> pIntro;
+    std::unique_ptr<MenuPrincipal> pMenu;
+
     Equipo   eH, eCPU;
     Pelota   pelota;
     Cancha   cancha;
     HUD      hud;
     sf::Music musica;
 
-    EstadoJuego estado = EstadoJuego::SELECCION;
-    float tiempo  = TIEMPO_MITAD;
-    int   mitad   = 1;
+    Pantalla pantalla = Pantalla::INTRO;
+    float tiempo = TIEMPO_MITAD;
+    int   mitad  = 1;
 
     sf::RectangleShape fondoRect;
 
-    // ── Controles dunk en aire ──
     bool  esperandoDunkEnAire = false;
-    float timerSalto          = 0.f;
-
-    // ── Alley-oop pendiente ──
     bool  alleyOopActivado    = false;
     int   alleyOopReceptor    = -1;
-    float timerAlleyOop       = 0.f;    // ventana para recibir el pase
-
-    // ── Cooldowns ──
-    float cdTiro  = 0.f;
-    float cdPase  = 0.f;
-    float cdRobo  = 0.f;
-    float cdEmpuje = 0.f;
-
-    // ── Post gol ──
-    float pausaPostGol = 0.f;
-
-    // ── Selección ──
-    int equipoSeleccionado = 0;
-
-    // ── Indicador de bloqueo exitoso ──
-    bool  bloqueadoReciente = false;
-    float timerBloqueado    = 0.f;
-
-    // ── Intercepción reciente ──
-    bool  interceptadoReciente = false;
-    float timerInterceptado     = 0.f;
+    float cdTiro=0, cdPase=0, cdRobo=0, cdEmpuje=0;
+    float pausaPostGol = 0;
+    int   equipoSeleccionado = 0;
 
 public:
     GameManager()
@@ -127,1070 +531,115 @@ public:
         ventana.setFramerateLimit(60);
         srand((unsigned)time(nullptr));
 
-        fondoRect.setSize({(float)W_ANCHO, (float)W_ALTO});
-        fondoRect.setFillColor(sf::Color(22, 12, 4));
+        fuenteOk = fuente.loadFromFile("assets/front/texto.ttf");
+        fondoRect.setSize({(float)W_ANCHO,(float)W_ALTO});
+        fondoRect.setFillColor(sf::Color(22,12,4));
+
+        // Carga única y segura de texturas al iniciar el juego
+        tFondo.loadFromFile("assets/imagenes/pantalla inicial del juego.jpg");
+        tGoku.loadFromFile("assets/imagenes/goku.png");
+        tMistico.loadFromFile("assets/imagenes/mistico.png");
+        tPocoyo.loadFromFile("assets/imagenes/Pocoyo.png");
 
         if (musica.openFromFile("assets/musica/Gang$tazz.ogg")) {
             musica.setLoop(true);
             musica.setVolume(55.f);
             musica.play();
         }
+
+        // Construcción segura pasando las texturas cargadas
+        pIntro = std::make_unique<PantallaIntro>(fuente, fuenteOk, tFondo, tGoku, tMistico, tPocoyo);
+        pMenu  = std::make_unique<MenuPrincipal>(fuente, fuenteOk, tFondo, tGoku, tMistico, tPocoyo);
     }
 
-    // ─── Inicializar partido ───────────────────
+    ~GameManager() = default;
+
     void iniciarPartida() {
-        estado  = EstadoJuego::JUGANDO;
-        tiempo  = TIEMPO_MITAD;
-        mitad   = 1;
-        cdTiro  = cdPase = cdRobo = cdEmpuje = 0.f;
-        pausaPostGol = 0.f;
+        pantalla = Pantalla::JUGANDO;
+        tiempo   = TIEMPO_MITAD;
+        mitad    = 1;
+        cdTiro = cdPase = cdRobo = cdEmpuje = pausaPostGol = 0.f;
         esperandoDunkEnAire = false;
         alleyOopActivado    = false;
         alleyOopReceptor    = -1;
 
-        DatosEquipo dH = equipoCartoon();
+        DatosEquipo dH   = equipoCartoon();
         DatosEquipo dCPU = equipoRival();
-        if (equipoSeleccionado == 1) {
-            std::swap(dH, dCPU);
-        }
+        if (equipoSeleccionado == 1) std::swap(dH, dCPU);
 
-        eH.configurar(dH, true);
+        eH.configurar(dH,   true);
         eCPU.configurar(dCPU, false);
-
         eH.puntos = eCPU.puntos = 0;
         eH.superMeter = eCPU.superMeter = 0.f;
-        eH.asistencias = eH.robos = eH.bloqueos = eH.alleyOops = 0;
-        eCPU.asistencias = eCPU.robos = eCPU.bloqueos = eCPU.alleyOops = 0;
 
-        sf::Vector2f posH[3] = {
-            {C_X + 210.f, ARO_Y},
-            {C_X + 265.f, ARO_Y - 95.f},
-            {C_X + 265.f, ARO_Y + 95.f}
-        };
-        sf::Vector2f posCPU[3] = {
-            {C_X + C_ANCHO - 210.f, ARO_Y},
-            {C_X + C_ANCHO - 265.f, ARO_Y - 95.f},
-            {C_X + C_ANCHO - 265.f, ARO_Y + 95.f}
-        };
+        sf::Vector2f posH[3]   = {{C_X+210.f,ARO_Y},{C_X+265.f,ARO_Y-95.f},{C_X+265.f,ARO_Y+95.f}};
+        sf::Vector2f posCPU[3] = {{C_X+C_ANCHO-210.f,ARO_Y},{C_X+C_ANCHO-265.f,ARO_Y-95.f},{C_X+C_ANCHO-265.f,ARO_Y+95.f}};
+
         for (int i = 0; i < 3; i++) {
-            eH.j[i].pos  = posH[i];
+            eH.j[i].pos   = posH[i];
             eCPU.j[i].pos = posCPU[i];
-            eH.j[i].tienePelota  = false;
-            eCPU.j[i].tienePelota = false;
-            eH.j[i].estado  = EstadoJ::IDLE;
-            eCPU.j[i].estado = EstadoJ::IDLE;
-            eH.j[i].estamina = eCPU.j[i].estamina = 100.f;
+            eH.j[i].tienePelota   = eCPU.j[i].tienePelota = false;
+            eH.j[i].estado        = eCPU.j[i].estado       = EstadoJ::IDLE;
         }
         eH.activo = eCPU.activo = 0;
-
         eH.j[0].tienePelota = true;
         pelota.pos = eH.j[0].pos;
-        pelota.enManos = true;
-        pelota.enJuego = false;
-        pelota.enArco  = false;
+        pelota.enManos = true; pelota.enJuego = false; pelota.enArco = false;
     }
 
-    // ─── Reiniciar posesión ────────────────────
-    void reiniciarPosesion(bool humanoCogePelota) {
-        eH.quitarPelota();
-        eCPU.quitarPelota();
-        pelota.enArco  = false;
-        pelota.enJuego = false;
-        pelota.enManos = true;
-        pelota.esSuper = false;
-        alleyOopActivado = false;
-        alleyOopReceptor = -1;
-
-        sf::Vector2f centro = {C_X + C_ANCHO/2.f, C_Y + C_ALTO/2.f};
-        pelota.pos = centro;
-
-        if (humanoCogePelota) {
-            eH.j[0].pos = centro;
-            eH.darPelota(0);
-        } else {
-            eCPU.j[0].pos = centro;
-            eCPU.darPelota(0);
-        }
+    void reiniciarPosesion(bool hCoge) {
+        eH.quitarPelota(); eCPU.quitarPelota();
+        pelota.enArco = pelota.enJuego = false;
+        pelota.enManos = true; pelota.esSuper = false;
+        alleyOopActivado = false; alleyOopReceptor = -1;
+        sf::Vector2f c = {C_X + C_ANCHO/2.f, C_Y + C_ALTO/2.f};
+        pelota.pos = c;
+        if (hCoge) { eH.j[0].pos = c;   eH.darPelota(0); }
+        else       { eCPU.j[0].pos = c; eCPU.darPelota(0); }
     }
 
-    // ─── Calcular resultado del tiro ─────────────
-    int evalEnceste(bool esEquipoH, float distAlAro) {
-        Jugador& j = esEquipoH ? eH.j[eH.activo] : eCPU.j[eCPU.activo];
-        bool esTres = distAlAro > DIST_3P;
-        float p = j.probTiro(distAlAro, esTres);
+    int evalEnceste(bool esH, float d) {
+        Jugador& j = esH ? eH.j[eH.activo] : eCPU.j[eCPU.activo];
+        bool es3 = d > DIST_3P;
+        float p  = j.probTiro(d, es3);
         if (pelota.esSuper) p = std::min(p + 0.40f, 0.97f);
         if (!prob(p)) return 0;
-        return esTres ? 3 : 2;
+        return es3 ? 3 : 2;
     }
 
-    // ─── Anotar ───────────────────────────────
-    void anotar(bool equipoH, int pts, sf::Vector2f /*posAro*/) {
-        std::string msg;
-        if (pelota.esSuper)        msg = "!SUPER DUNK!";
-        else if (pelota.esAlleyOop) msg = "!ALLEY-OOP!";
-        else if (pts == 3)         msg = "!TRIPLE!";
-        else                       msg = "CANASTA!";
+    void anotar(bool eqH, int pts) {
+        std::string msg = pelota.esSuper ? "!SUPER DUNK!" : (pts == 3 ? "!TRIPLE!" : "CANASTA!");
+        sf::Color c = eqH ? sf::Color(255,200,0) : sf::Color(100,200,255);
+        if (eqH) eH.sumarPuntos(pts); else eCPU.sumarPuntos(pts);
 
-        sf::Color c = equipoH ? sf::Color(255,200,0) : sf::Color(100,200,255);
-
-        if (equipoH) {
-            eH.sumarPuntos(pts);
-            hud.flash(sf::Color(255,200,0));
-        } else {
-            eCPU.sumarPuntos(pts);
-            hud.flash(sf::Color(80,120,255));
-        }
         hud.mensaje(msg, c, 2.5f);
         pausaPostGol = 1.3f;
-        reiniciarPosesion(!equipoH);
+        reiniciarPosesion(!eqH);
     }
 
-    // ─── Lanzar tiro normal ───────────────────
     void lanzarTiroNormal(bool esH) {
         Jugador& act = esH ? eH.j[eH.activo] : eCPU.j[eCPU.activo];
         Equipo&  eq  = esH ? eH : eCPU;
         if (!act.tienePelota) return;
 
-        sf::Vector2f aroPos = esH
-            ? sf::Vector2f{ARO_DER_CX, ARO_Y}
-            : sf::Vector2f{ARO_IZQ_CX, ARO_Y};
-
-        float d    = dist2(act.pos, aroPos);
-        bool super = eq.superLleno();
-        if (super) eq.gastarSuper();
+        sf::Vector2f ap = esH ? sf::Vector2f{ARO_DER_CX, ARO_Y} : sf::Vector2f{ARO_IZQ_CX, ARO_Y};
+        float d   = dist2(act.pos, ap);
+        bool  sup = eq.superLleno();
+        if (sup) eq.gastarSuper();
 
         act.tienePelota = false;
-        act.setEstado(super ? EstadoJ::SUPER_SHOT : EstadoJ::LANZANDO, 0.6f);
-        act.fintaActiva = false;
+        act.setEstado(sup ? EstadoJ::SUPER_SHOT : EstadoJ::LANZANDO, 0.6f);
 
-        float tVuelo = 0.45f + d / 1300.f;
-        pelota.lanzarTiro(act.pos, aroPos, tVuelo, super);
+        float tv = 0.45f + d / 1300.f;
+        pelota.lanzarTiro(act.pos, ap, tv, sup);
         pelota.esEquipoH = esH;
 
-        int pts = evalEnceste(esH, d);
-        pelota.anotoPendiente  = (pts > 0);
-        pelota.puntosPendientes = pts;
+        int p = evalEnceste(esH, d);
+        pelota.anotoPendiente   = (p > 0);
+        pelota.puntosPendientes = p;
 
         cdTiro = 0.85f;
-        esperandoDunkEnAire = false;
-        alleyOopActivado    = false;
-        if (esH) cdTiro = 0.85f;
     }
-
-    // ─── Lanzar dunk en aire ──────────────────
-    void lanzarDunk(bool esH) {
-        Jugador& act = esH ? eH.j[eH.activo] : eCPU.j[eCPU.activo];
-        Equipo&  eq  = esH ? eH : eCPU;
-        if (!act.tienePelota) return;
-
-        sf::Vector2f aroPos = esH
-            ? sf::Vector2f{ARO_DER_CX, ARO_Y}
-            : sf::Vector2f{ARO_IZQ_CX, ARO_Y};
-
-        float d    = dist2(act.pos, aroPos);
-        bool super = eq.superLleno();
-        if (super) eq.gastarSuper();
-
-        act.tienePelota = false;
-        act.setEstado(EstadoJ::DUNKEANDO, 0.55f);
-
-        float tVuelo = 0.5f + d / 1100.f;
-        pelota.lanzarTiro(act.pos, aroPos, tVuelo, super);
-        pelota.esEquipoH = esH;
-
-        // Dunk: +15% de probabilidad
-        float d2   = dist2(act.pos, aroPos);
-        bool  esTres = d2 > DIST_3P;
-        float p = act.probTiro(d2, esTres) + 0.15f;
-        if (super) p = std::min(p + 0.40f, 0.97f);
-        p = std::min(p, 0.95f);
-        if (!prob(p)) {
-            pelota.anotoPendiente   = false;
-            pelota.puntosPendientes = 0;
-        } else {
-            pelota.anotoPendiente   = true;
-            pelota.puntosPendientes = esTres ? 3 : 2;
-        }
-
-        cdTiro = 0.9f;
-        esperandoDunkEnAire = false;
-    }
-
-    // ─── Finta ────────────────────────────────
-    void activarFinta() {
-        Jugador& act = eH.j[eH.activo];
-        if (!act.tienePelota || act.fintaActiva) return;
-        act.fintaActiva = true;
-        act.timerFinta  = 0.45f;
-        act.setEstado(EstadoJ::FINTANDO, 0.45f);
-        // La finta puede provocar que la IA pierda posición defensiva
-        hud.mensaje("FINTA!", sf::Color(255, 160, 0), 0.8f);
-    }
-
-    // ─── Pase entre compañeros ─────────────────
-    void lanzarPase() {
-        Jugador& act = eH.j[eH.activo];
-        if (!act.tienePelota) return;
-
-        sf::Vector2f aro{ARO_DER_CX, ARO_Y};
-
-        // ── Si hay un receptor de alley-oop esperando, hacer alley-oop ──
-        if (alleyOopActivado && alleyOopReceptor >= 0 &&
-            eH.j[alleyOopReceptor].esperandoAlleyOop) {
-            int r = alleyOopReceptor;
-            act.tienePelota = false;
-            act.setEstado(EstadoJ::PASANDO, 0.35f);
-            float tVuelo = dist2(act.pos, eH.j[r].pos) / 650.f + 0.12f;
-            pelota.lanzarAlleyOop(act.pos, eH.j[r].pos, tVuelo);
-            pelota.esEquipoH = true;
-            eH.receptorAlleyOop = r;
-            eH.receptorPase  = -1;
-            eH.sumarSuperAlleyOop();
-            alleyOopActivado = false;
-            cdPase = 0.65f;
-            hud.mensaje("ALLEY-OOP!", sf::Color(255, 220, 0), 1.2f);
-            return;
-        }
-
-        // Pase normal al compañero más libre (más cerca del aro)
-        int receptor = -1;
-        float minD   = 1e9f;
-        for (int i = 0; i < 3; i++) {
-            if (i == eH.activo) continue;
-            float d2 = dist2(eH.j[i].pos, aro);
-            if (d2 < minD) { minD = d2; receptor = i; }
-        }
-        if (receptor < 0) return;
-
-        act.tienePelota = false;
-        act.setEstado(EstadoJ::PASANDO, 0.35f);
-
-        float tVuelo = dist2(act.pos, eH.j[receptor].pos) / 720.f + 0.08f;
-        pelota.lanzarPase(act.pos, eH.j[receptor].pos, tVuelo);
-        pelota.esEquipoH = true;
-        eH.receptorPase  = receptor;
-        eH.receptorAlleyOop = -1;
-        eH.sumarSuperPase();
-        cdPase = 0.6f;
-    }
-
-    // ─── Alley-oop: J+K cuando NO tienes pelota ──
-    void activarAlleyOop() {
-        Jugador& act = eH.j[eH.activo];
-        if (act.tienePelota) return;
-        // El jugador activo salta esperando el pase
-        act.setEstado(EstadoJ::ALLEYOOP_VUELO, 0.9f);
-        act.esperandoAlleyOop = true;
-        act.timerAlleyOop     = 0.9f;
-        alleyOopActivado  = true;
-        alleyOopReceptor  = eH.activo;
-    }
-
-    // ─── Bloqueo humano ───────────────────────
-    void intentarBloqueo() {
-        Jugador& act = eH.j[eH.activo];
-        act.setEstado(EstadoJ::BLOQUEANDO, 0.38f);
-        cdRobo = 0.45f;
-
-        if (!pelota.enArco || pelota.esPase || pelota.esEquipoH) return;
-
-        // La pelota está en vuelo hacia el aro humano
-        float d2 = dist2(act.pos, pelota.pos);
-        if (d2 < RADIO_BLOQUEO) {
-            float p = act.probBloqueo();
-            if (prob(p)) {
-                // Bloqueo exitoso: la pelota sale disparada libre
-                pelota.enArco  = false;
-                pelota.anotoPendiente = false;
-                float vx = (eH.activo < 1 ? 1.f : -1.f) * 90.f;
-                float vy = ((float)rand()/RAND_MAX - 0.5f) * 60.f;
-                pelota.soltarLibre(pelota.pos, {vx, vy});
-                eH.sumarSuperBloqueo();
-                bloqueadoReciente = true;
-                timerBloqueado    = 0.f;
-                act.timerFlash    = 0.45f;
-                hud.mensaje("!BLOQUEADO!", sf::Color(100,255,100), 1.5f);
-            }
-        }
-    }
-
-    // ─── Robo humano ──────────────────────────
-    void intentarRoboHumano() {
-        Jugador& act = eH.j[eH.activo];
-        act.setEstado(EstadoJ::ROBANDO, 0.35f);
-
-        for (auto& jcpu : eCPU.j) {
-            if (!jcpu.tienePelota) continue;
-            float d2 = dist2(act.pos, jcpu.pos);
-            if (d2 < RADIO_ROBO + 8.f) {
-                float p = act.probRobo() * 0.55f;
-                if (prob(p)) {
-                    jcpu.tienePelota = false;
-                    act.tienePelota  = true;
-                    pelota.pos  = act.pos;
-                    pelota.enManos = true;
-                    pelota.enJuego = false;
-                    eH.sumarSuperRobo();
-                    hud.mensaje("!ROBO!", sf::Color(255,255,100), 1.5f);
-                }
-                break;
-            }
-        }
-    }
-
-    // ─── Empuje estilo Street Hoop ────────────
-    void intentarEmpuje() {
-        if (cdEmpuje > 0.f) return;
-        Jugador& act = eH.j[eH.activo];
-        cdEmpuje = 0.7f;
-        act.setEstado(EstadoJ::EMPUJANDO, 0.25f);
-
-        for (auto& jcpu : eCPU.j) {
-            float d2 = dist2(act.pos, jcpu.pos);
-            if (d2 < J_RADIO * 2.6f) {
-                sf::Vector2f dir = norm2(jcpu.pos - act.pos);
-                jcpu.recibirEmpuje(dir, 180.f);
-
-                // Probabilidad de perder la pelota al recibir empujón
-                if (jcpu.tienePelota && prob(0.30f)) {
-                    jcpu.tienePelota = false;
-                    pelota.soltarLibre(jcpu.pos,
-                        {dir.x * 80.f + ((float)rand()/RAND_MAX - 0.5f)*40.f,
-                         dir.y * 60.f + ((float)rand()/RAND_MAX - 0.5f)*40.f});
-                }
-                break;
-            }
-        }
-    }
-
-    // ─── Interceptar pase en vuelo ────────────
-    void verificarIntercepciones() {
-        if (!pelota.enArco || !pelota.esPase) return;
-
-        // Humano intercepta pase de CPU
-        if (!pelota.esEquipoH) {
-            for (int i = 0; i < 3; i++) {
-                Jugador& jh = eH.j[i];
-                if (jh.timerAturdido > 0.f) continue;
-                float d2 = dist2(jh.pos, pelota.pos);
-                if (d2 < J_RADIO + P_RADIO + 18.f) {
-                    float p = jh.probInterceptar();
-                    if (prob(p * 0.5f)) {
-                        eH.darPelota(i);
-                        pelota.tomarla();
-                        pelota.pos = jh.pos;
-                        eCPU.receptorPase = -1;
-                        eCPU.receptorAlleyOop = -1;
-                        eH.sumarSuperRobo();
-                        interceptadoReciente = true;
-                        timerInterceptado    = 0.f;
-                        hud.mensaje("INTERCEPCION!", sf::Color(100,255,200), 1.5f);
-                    }
-                    return;
-                }
-            }
-        }
-        // CPU intercepta pase del humano
-        else {
-            for (int i = 0; i < 3; i++) {
-                Jugador& jcpu = eCPU.j[i];
-                if (jcpu.timerAturdido > 0.f) continue;
-                float d2 = dist2(jcpu.pos, pelota.pos);
-                if (d2 < J_RADIO + P_RADIO + 14.f) {
-                    float p = jcpu.probInterceptar() * 0.38f;
-                    if (prob(p)) {
-                        eCPU.darPelota(i);
-                        pelota.tomarla();
-                        pelota.pos = jcpu.pos;
-                        eH.receptorPase = -1;
-                        eH.receptorAlleyOop = -1;
-                        eCPU.sumarSuperRobo();
-                        hud.mensaje("Pase cortado!", sf::Color(100,180,255), 1.2f);
-                    }
-                    return;
-                }
-            }
-        }
-    }
-
-    // ─── Bloqueo de la IA ─────────────────────
-    void verificarBloqueoIA() {
-        if (!pelota.enArco || pelota.esPase) return;
-        if (!pelota.esEquipoH) return;  // la pelota va hacia el aro de la CPU
-
-        // Si la pelota va hacia el aro de la CPU, un defensor puede bloquearla
-        for (int i = 0; i < 3; i++) {
-            Jugador& def = eCPU.j[i];
-            float d2 = dist2(def.pos, pelota.pos);
-            if (d2 < RADIO_BLOQUEO + 10.f && def.timerAturdido <= 0.f) {
-                float p = def.probBloqueo() * 0.30f;  // más difícil para la IA
-                if (prob(p * (1.f/60.f) * 120.f)) {  // ajustado por frame
-                    pelota.enArco = false;
-                    pelota.anotoPendiente = false;
-                    def.setEstado(EstadoJ::BLOQUEANDO, 0.38f);
-                    float vx = -90.f;
-                    float vy = ((float)rand()/RAND_MAX - 0.5f) * 60.f;
-                    pelota.soltarLibre(pelota.pos, {vx, vy});
-                    eCPU.sumarSuperBloqueo();
-                    hud.mensaje("BLOQUEO!", sf::Color(100,200,255), 1.2f);
-                    return;
-                }
-            }
-        }
-    }
-
-    // ─── INPUT HUMANO ─────────────────────────
-    void inputHumano(float dt) {
-        if (estado != EstadoJuego::JUGANDO || pausaPostGol > 0.f) return;
-
-        Jugador& act = eH.porActivo();
-        bool tieneB = act.tienePelota;
-
-        cdTiro  = std::max(0.f, cdTiro  - dt);
-        cdPase  = std::max(0.f, cdPase  - dt);
-        cdRobo  = std::max(0.f, cdRobo  - dt);
-        cdEmpuje = std::max(0.f, cdEmpuje - dt);
-
-        // ── Movimiento WASD ──
-        sf::Vector2f dir{};
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) dir.x -= 1.f;
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) dir.x += 1.f;
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::W)) dir.y -= 1.f;
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) dir.y += 1.f;
-        bool sprint = sf::Keyboard::isKeyPressed(sf::Keyboard::LShift);
-
-        // No moverse si está en estados fijos
-        bool puedeMove = (act.estado == EstadoJ::IDLE ||
-                          act.estado == EstadoJ::CORRIENDO ||
-                          act.estado == EstadoJ::FINTANDO);
-        if (puedeMove) act.mover(dir, dt, sprint);
-
-        // Sincronizar pelota con portador
-        if (tieneB && !pelota.enArco) pelota.pos = act.pos;
-
-        // ── Auto-switch cuando no tenemos pelota ──
-        if (!tieneB && !pelota.enArco && pelota.enJuego && !alleyOopActivado) {
-            int mejorI = eH.activo;
-            float minD = dist2(eH.j[eH.activo].pos, pelota.pos);
-            for (int i = 0; i < 3; i++) {
-                if (i == eH.activo) continue;
-                float d2 = dist2(eH.j[i].pos, pelota.pos);
-                if (d2 < minD - 30.f) { minD = d2; mejorI = i; }
-            }
-            if (mejorI != eH.activo) {
-                eH.j[eH.activo].esHumano = false;
-                eH.activo = mejorI;
-                eH.j[eH.activo].esHumano = true;
-            }
-        }
-
-        bool jP = sf::Keyboard::isKeyPressed(sf::Keyboard::J);
-        bool kP = sf::Keyboard::isKeyPressed(sf::Keyboard::K);
-        bool lP = sf::Keyboard::isKeyPressed(sf::Keyboard::L);
-
-        // ── OFENSIVA ──────────────────────────
-        if (tieneB) {
-            // J+K → saltar para dunk
-            if (jP && kP && cdTiro <= 0.f && !esperandoDunkEnAire) {
-                act.setEstado(EstadoJ::EN_AIRE, 0.55f);
-                esperandoDunkEnAire = true;
-                cdTiro = 0.3f;
-            }
-            // En el aire → J para dunk
-            else if (esperandoDunkEnAire && act.estado == EstadoJ::EN_AIRE
-                     && jP && cdTiro <= 0.f) {
-                lanzarDunk(true);
-            }
-            // J solo → tiro normal
-            else if (jP && !kP && cdTiro <= 0.f && !esperandoDunkEnAire) {
-                lanzarTiroNormal(true);
-            }
-            // K solo → pase
-            else if (kP && !jP && cdPase <= 0.f) {
-                lanzarPase();
-            }
-            // L solo → finta
-            else if (lP && cdTiro <= 0.f && !act.fintaActiva && !esperandoDunkEnAire) {
-                activarFinta();
-                cdTiro = 0.5f;
-            }
-            // Cancelar salto sin dunk
-            if (esperandoDunkEnAire && act.estado != EstadoJ::EN_AIRE) {
-                esperandoDunkEnAire = false;
-                lanzarTiroNormal(true);
-            }
-        }
-        // ── DEFENSIVA ─────────────────────────
-        else {
-            // J → bloqueo (si hay tiro en vuelo) o empuje (si hay rival cerca)
-            if (jP && cdRobo <= 0.f) {
-                if (pelota.enArco && !pelota.esPase && !pelota.esEquipoH) {
-                    intentarBloqueo();
-                } else {
-                    intentarEmpuje();
-                }
-            }
-            // K → robo
-            if (kP && cdRobo <= 0.f) {
-                intentarRoboHumano();
-                cdRobo = 0.6f;
-            }
-            // J+K → alley-oop receptor (salta esperando pase del compañero)
-            if (jP && kP && cdTiro <= 0.f && !alleyOopActivado) {
-                activarAlleyOop();
-                cdTiro = 1.f;
-            }
-            // L → empuje directo
-            if (lP && cdEmpuje <= 0.f) {
-                intentarEmpuje();
-            }
-        }
-    }
-
-    // ─── IA DEL CPU ───────────────────────────
-    void updateIA(float dt) {
-        if (estado != EstadoJuego::JUGANDO || pausaPostGol > 0.f) return;
-
-        Jugador* conPelota = eCPU.conPelota();
-        sf::Vector2f aroObj{ARO_IZQ_CX, ARO_Y};
-
-        if (conPelota) {
-            float distAro = dist2(conPelota->pos, aroObj);
-
-            sf::Vector2f d2 = norm2(aroObj - conPelota->pos);
-            if (conPelota->timerAturdido <= 0.f)
-                conPelota->mover(d2, dt * 0.88f);
-            pelota.pos = conPelota->pos;
-
-            bool enZona3 = distAro < DIST_3P + 35.f && distAro > DIST_3P - 15.f;
-            bool enZona2 = distAro < 155.f;
-
-            // ── IA: Super dunk cuando tiene el meter lleno ──
-            if (eCPU.superLleno() && distAro < 220.f && prob(0.028f * (dt * 60.f))) {
-                // Primero salta
-                conPelota->setEstado(EstadoJ::EN_AIRE, 0.55f);
-                // Luego ejecuta dunk (en siguiente frame lo toma updateIA)
-                lanzarDunk(false);
-                return;
-            }
-
-            // ── Tiro normal ──
-            if ((enZona2 || enZona3) && prob((enZona2 ? 0.030f : 0.022f) * (dt * 60.f))) {
-                lanzarTiroNormal(false);
-                return;
-            }
-
-            // ── Pase a compañero más libre ──
-            if (distAro > 260.f && prob(0.012f * (dt * 60.f))) {
-                int mejor = -1;
-                float mDist = distAro;
-                for (int i = 0; i < 3; i++) {
-                    if (eCPU.j[i].tienePelota) continue;
-                    float dc = dist2(eCPU.j[i].pos, aroObj);
-                    if (dc < mDist - 50.f) { mDist = dc; mejor = i; }
-                }
-                if (mejor >= 0) {
-                    conPelota->tienePelota = false;
-                    conPelota->setEstado(EstadoJ::PASANDO, 0.35f);
-                    float tV = dist2(conPelota->pos, eCPU.j[mejor].pos) / 720.f + 0.08f;
-                    pelota.lanzarPase(conPelota->pos, eCPU.j[mejor].pos, tV);
-                    pelota.esEquipoH = false;
-                    eCPU.receptorPase = mejor;
-                    eCPU.sumarSuperPase();
-                    return;
-                }
-            }
-
-            // ── Alley-oop de la IA ──
-            if (distAro > 120.f && distAro < 250.f && prob(0.008f * (dt * 60.f))) {
-                int recep = eCPU.mejorReceptorAlleyOop(aroObj);
-                if (recep >= 0 && dist2(eCPU.j[recep].pos, aroObj) < 130.f) {
-                    // Receptor salta
-                    eCPU.j[recep].setEstado(EstadoJ::ALLEYOOP_VUELO, 0.75f);
-                    eCPU.j[recep].esperandoAlleyOop = true;
-                    eCPU.j[recep].timerAlleyOop     = 0.75f;
-                    // Pase alley-oop
-                    conPelota->tienePelota = false;
-                    conPelota->setEstado(EstadoJ::PASANDO, 0.35f);
-                    float tV = dist2(conPelota->pos, eCPU.j[recep].pos) / 650.f + 0.12f;
-                    pelota.lanzarAlleyOop(conPelota->pos, eCPU.j[recep].pos, tV);
-                    pelota.esEquipoH = false;
-                    eCPU.receptorAlleyOop = recep;
-                    eCPU.sumarSuperAlleyOop();
-                    hud.mensaje("Alley-oop rival!", sf::Color(100,180,255), 1.2f);
-                    return;
-                }
-            }
-
-            // Compañeros sin pelota: posicionarse
-            for (int i = 0; i < 3; i++) {
-                if (eCPU.j[i].tienePelota) continue;
-                if (eCPU.j[i].timerAturdido > 0.f) continue;
-                sf::Vector2f obj = {aroObj.x + 80.f + i * 55.f,
-                                    aroObj.y + (float)((i-1) * 110)};
-                obj.x = std::max(C_X + J_RADIO, std::min(obj.x, C_X + C_ANCHO - J_RADIO));
-                obj.y = std::max(C_Y + J_RADIO, std::min(obj.y, C_Y + C_ALTO  - J_RADIO));
-                sf::Vector2f d3 = norm2(obj - eCPU.j[i].pos);
-                if (dist2(eCPU.j[i].pos, obj) > 12.f)
-                    eCPU.j[i].mover(d3, dt * 0.65f);
-            }
-        }
-        // ── CPU no tiene pelota: defender ──
-        else {
-            for (int i = 0; i < 3; i++) {
-                Jugador& defensor = eCPU.j[i];
-                if (defensor.timerAturdido > 0.f) continue;
-                Jugador& objetivo = eH.j[i % 3];
-
-                sf::Vector2f posDefensa = objetivo.pos;
-                sf::Vector2f dAro = norm2(aroObj - objetivo.pos);
-                posDefensa += dAro * 42.f;
-
-                sf::Vector2f dir = norm2(posDefensa - defensor.pos);
-                if (dist2(defensor.pos, posDefensa) > 20.f)
-                    defensor.mover(dir, dt * 0.80f);
-
-                // Intento de robo
-                if (objetivo.tienePelota) {
-                    float d2 = dist2(defensor.pos, objetivo.pos);
-                    // Finta hace que la IA se equivoque
-                    float multFinta = objetivo.fintaActiva ? 0.3f : 1.f;
-                    if (d2 < RADIO_ROBO && prob(defensor.probRobo() * dt * 1.8f * multFinta)) {
-                        objetivo.tienePelota  = false;
-                        defensor.tienePelota  = true;
-                        pelota.pos    = defensor.pos;
-                        pelota.enManos = true;
-                        pelota.enJuego = false;
-                        eCPU.activo   = i;
-                        eCPU.sumarSuperRobo();
-                        esperandoDunkEnAire = false;
-                        alleyOopActivado    = false;
-                        hud.mensaje("Robo del rival", sf::Color(100,200,255), 1.2f);
-                    }
-                }
-
-                // Empuje de la IA (ocasional)
-                if (!objetivo.tienePelota && prob(0.004f * (dt * 60.f))) {
-                    float d2 = dist2(defensor.pos, objetivo.pos);
-                    if (d2 < J_RADIO * 2.5f) {
-                        sf::Vector2f dirE = norm2(objetivo.pos - defensor.pos);
-                        objetivo.recibirEmpuje(dirE, 140.f);
-                        if (objetivo.tienePelota && prob(0.20f)) {
-                            objetivo.tienePelota = false;
-                            pelota.soltarLibre(objetivo.pos,
-                                {dirE.x * 70.f, dirE.y * 50.f});
-                        }
-                    }
-                }
-            }
-
-            // ¿CPU puede recoger pelota libre?
-            if (pelota.enJuego) {
-                for (int i = 0; i < 3; i++) {
-                    if (dist2(eCPU.j[i].pos, pelota.pos) < J_RADIO + P_RADIO + 5.f) {
-                        eH.quitarPelota();
-                        eCPU.darPelota(i);
-                        pelota.tomarla();
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    // ─── Verificar pelota libre ───────────────
-    void verificarPelotaLibre() {
-        if (!pelota.enJuego) return;
-        Jugador& actH = eH.j[eH.activo];
-        if (!actH.tienePelota && dist2(actH.pos, pelota.pos) < J_RADIO + P_RADIO + 8.f) {
-            eH.darPelota(eH.activo);
-            pelota.tomarla();
-        }
-    }
-
-    // ─── Verificar llegada de pase (normal) ──
-    void verificarPase() {
-        if (!pelota.enArco || !pelota.esPase || pelota.esAlleyOop) return;
-        if (pelota.progreso() < 0.88f) return;
-
-        if (pelota.esEquipoH && eH.receptorPase >= 0) {
-            int r = eH.receptorPase;
-            eH.j[eH.activo].esHumano = false;
-            eH.darPelota(r);
-            eH.j[r].esHumano = true;
-            pelota.tomarla();
-            pelota.pos = eH.j[r].pos;
-            eH.receptorPase = -1;
-        }
-        else if (!pelota.esEquipoH && eCPU.receptorPase >= 0) {
-            int r = eCPU.receptorPase;
-            eCPU.darPelota(r);
-            pelota.tomarla();
-            pelota.pos = eCPU.j[r].pos;
-            eCPU.receptorPase = -1;
-        }
-    }
-
-    // ─── Verificar alley-oop ──────────────────
-    void verificarAlleyOop() {
-        if (!pelota.enArco || !pelota.esPase || !pelota.esAlleyOop) return;
-        if (pelota.progreso() < 0.85f) return;
-
-        if (pelota.esEquipoH && eH.receptorAlleyOop >= 0) {
-            int r = eH.receptorAlleyOop;
-            Jugador& receptor = eH.j[r];
-            // Receptor ejecuta dunk automático
-            receptor.esperandoAlleyOop = false;
-            receptor.tienePelota = true;
-            pelota.tomarla();
-            pelota.pos = receptor.pos;
-            eH.activo  = r;
-            eH.j[r].esHumano = true;
-            eH.receptorAlleyOop = -1;
-            // Ejecutar dunk (el receptor ya está en el aire)
-            lanzarDunk(true);
-        }
-        else if (!pelota.esEquipoH && eCPU.receptorAlleyOop >= 0) {
-            int r = eCPU.receptorAlleyOop;
-            Jugador& receptor = eCPU.j[r];
-            receptor.esperandoAlleyOop = false;
-            receptor.tienePelota = true;
-            pelota.tomarla();
-            pelota.pos = receptor.pos;
-            eCPU.activo = r;
-            eCPU.receptorAlleyOop = -1;
-            lanzarDunk(false);
-        }
-    }
-
-    // ─── Verificar llegada de tiro ────────────
-    void verificarTiro() {
-        if (!pelota.enArco || pelota.esPase) return;
-        if (pelota.progreso() < 0.96f) return;
-
-        if (pelota.anotoPendiente) {
-            anotar(pelota.esEquipoH, pelota.puntosPendientes, pelota.dest);
-            pelota.anotoPendiente = false;
-        }
-    }
-
-    // ─── Colisiones entre jugadores ───────────
-    void resolverColisiones() {
-        std::vector<Jugador*> todos;
-        for (auto& jj : eH.j)   todos.push_back(&jj);
-        for (auto& jj : eCPU.j) todos.push_back(&jj);
-        float minSep = J_RADIO * 2.f - 2.f;
-        for (int a = 0; a < (int)todos.size(); a++) {
-            for (int b2 = a+1; b2 < (int)todos.size(); b2++) {
-                sf::Vector2f dv = todos[a]->pos - todos[b2]->pos;
-                float dl = std::sqrt(dv.x*dv.x + dv.y*dv.y);
-                if (dl < minSep && dl > 0.001f) {
-                    sf::Vector2f push = (dv / dl) * (minSep - dl) * 0.5f;
-                    todos[a]->pos += push;
-                    todos[b2]->pos -= push;
-                    todos[a]->clampCancha();
-                    todos[b2]->clampCancha();
-                }
-            }
-        }
-    }
-
-    // ─── UPDATE PRINCIPAL ─────────────────────
-    void update(float dt) {
-        hud.actualizar(dt);
-        eH.actualizar(dt);
-        eCPU.actualizar(dt);
-
-        if (estado == EstadoJuego::SELECCION) return;
-        if (estado == EstadoJuego::MEDIO_TIEMPO) return;
-        if (estado == EstadoJuego::FIN) return;
-
-        if (pausaPostGol > 0.f) {
-            pausaPostGol -= dt;
-            return;
-        }
-
-        // Cronómetro
-        tiempo -= dt;
-        if (tiempo <= 0.f) {
-            if (mitad == 1) {
-                mitad = 2;
-                tiempo = TIEMPO_MITAD;
-                estado = EstadoJuego::MEDIO_TIEMPO;
-                hud.mensaje("MEDIO TIEMPO", sf::Color(255,220,50), 3.f);
-                reiniciarPosesion(false);
-            } else {
-                estado = EstadoJuego::FIN;
-                std::string res = eH.puntos > eCPU.puntos ? "!GANASTE!" :
-                                  eH.puntos < eCPU.puntos ? "PERDISTE"  : "EMPATE";
-                hud.mensaje(res, sf::Color(255,220,50), 999.f);
-            }
-        }
-
-        pelota.actualizar(dt);
-
-        verificarTiro();
-        verificarPase();
-        verificarAlleyOop();
-        verificarPelotaLibre();
-        verificarIntercepciones();
-        verificarBloqueoIA();
-
-        inputHumano(dt);
-        updateIA(dt);
-        resolverColisiones();
-
-        // Sincronizar pelota con portador
-        for (auto& jj : eH.j)   if (jj.tienePelota && !pelota.enArco) pelota.pos = jj.pos;
-        for (auto& jj : eCPU.j) if (jj.tienePelota && !pelota.enArco) pelota.pos = jj.pos;
-    }
-
-    // ─── DIBUJAR ──────────────────────────────
-    void dibujar() {
-        ventana.clear();
-        ventana.draw(fondoRect);
-
-        if (estado == EstadoJuego::SELECCION) {
-            dibujarSeleccion();
-            ventana.display();
-            return;
-        }
-
-        cancha.dibujar(ventana);
-
-        // Ordenar todos los jugadores por Y (profundidad)
-        std::vector<Jugador*> todos;
-        for (auto& jj : eH.j)   todos.push_back(&jj);
-        for (auto& jj : eCPU.j) todos.push_back(&jj);
-        std::sort(todos.begin(), todos.end(), [](Jugador* a, Jugador* b){
-            return a->pos.y < b->pos.y;
-        });
-
-        // Sombras primero
-        for (auto* jj : todos) ventana.draw(jj->sombra);
-
-        // Pelota en suelo
-        if (pelota.enJuego) pelota.dibujar(ventana);
-
-        // Jugadores
-        for (auto* jj : todos) jj->dibujar(ventana);
-
-        // Pelota en arco o en manos (encima)
-        if (!pelota.enJuego) pelota.dibujar(ventana);
-
-        // Indicador de alley-oop activo (flecha)
-        if (alleyOopActivado && alleyOopReceptor >= 0) {
-            Jugador& rec = eH.j[alleyOopReceptor];
-            sf::Text t;
-            if (hud.fuenteOk) t.setFont(hud.fuente);
-            t.setString("ALLEY!");
-            t.setCharacterSize(16);
-            t.setFillColor(sf::Color(255,220,0,200));
-            t.setOutlineThickness(1.f);
-            t.setOutlineColor(sf::Color::Black);
-            sf::FloatRect b = t.getLocalBounds();
-            t.setOrigin(b.width/2.f, b.height/2.f);
-            t.setPosition(rec.pos.x, rec.pos.y - 75.f - rec.alturaSalto);
-            ventana.draw(t);
-        }
-
-        // HUD
-        hud.dibujar(ventana, eH.puntos, eCPU.puntos, tiempo, mitad,
-                    eH.superMeter, eCPU.superMeter, eH.nombre, eCPU.nombre);
-
-        if (estado == EstadoJuego::MEDIO_TIEMPO) {
-            overlayTexto("MEDIO TIEMPO", "Pulsa ENTER para la 2a mitad");
-        }
-        if (estado == EstadoJuego::FIN) {
-            std::string res = eH.puntos > eCPU.puntos ? "!GANASTE!" :
-                              eH.puntos < eCPU.puntos ? "PERDISTE"   : "EMPATE";
-            std::ostringstream ss;
-            ss << eH.puntos << " - " << eCPU.puntos
-               << "  |  R = Revanche  |  ESC = Salir";
-            overlayTexto(res, ss.str());
-
-            // Estadísticas del partido
-            dibujarEstadisticas();
-        }
-
-        ventana.display();
-    }
-
-    // ─── Estadísticas al final ────────────────
-    void dibujarEstadisticas() {
-        auto txtC = [&](const std::string& s, int sz, sf::Color c, float x, float y) {
-            sf::Text t;
-            if (hud.fuenteOk) t.setFont(hud.fuente);
-            t.setString(s); t.setCharacterSize(sz); t.setFillColor(c);
-            t.setOutlineThickness(1.f); t.setOutlineColor(sf::Color::Black);
-            sf::FloatRect b = t.getLocalBounds();
-            t.setOrigin(b.width/2.f, 0.f);
-            t.setPosition(x, y); ventana.draw(t);
-        };
-
-        float y0 = W_ALTO/2.f + 90.f;
-        txtC("Robos: " + std::to_string(eH.robos) +
-             "  Bloqueos: " + std::to_string(eH.bloqueos) +
-             "  Asistencias: " + std::to_string(eH.asistencias) +
-             "  Alley-oops: " + std::to_string(eH.alleyOops),
-             14, sf::Color(255,190,80), W_ANCHO/2.f, y0);
-    }
-
-    // ─── Pantalla de selección ────────────────
-    void dibujarSeleccion() {
-        sf::Font& f = hud.fuente;
-        bool fok    = hud.fuenteOk;
-
-        auto txt = [&](const std::string& s, int sz, sf::Color c,
-                        float x, float y, bool c2 = true) {
-            sf::Text t;
-            if (fok) t.setFont(f);
-            t.setString(s); t.setCharacterSize(sz); t.setFillColor(c);
-            t.setOutlineThickness(2.f); t.setOutlineColor(sf::Color::Black);
-            sf::FloatRect b = t.getLocalBounds();
-            if (c2) t.setOrigin(b.width/2.f, b.height/2.f);
-            t.setPosition(x, y); ventana.draw(t);
-        };
-
-        txt("CARTOON DUNK", 52, sf::Color(255,200,0), W_ANCHO/2.f, 80.f);
-        txt("Street Basketball 3v3  -  Street Hoop Style", 18,
-            sf::Color(200,200,200), W_ANCHO/2.f, 140.f);
-        txt("Elige tu equipo:", 26, sf::Color::White, W_ANCHO/2.f, 190.f);
-
-        float px = 230.f, py = 255.f;
-        sf::RectangleShape box1({280.f, 200.f});
-        box1.setPosition(px - 140.f, py - 20.f);
-        box1.setFillColor(equipoSeleccionado == 0
-            ? sf::Color(255,140,0,180) : sf::Color(50,30,10,120));
-        box1.setOutlineThickness(3.f);
-        box1.setOutlineColor(sf::Color(255,180,50));
-        ventana.draw(box1);
-
-        txt("CARTOON DUNK", 20, sf::Color(255,220,80), px, py);
-        txt("Goku / Pocoyo / Bugs", 14, sf::Color(220,220,200), px, py + 33.f);
-        txt("Dunk:  ████████░", 14, sf::Color(255,180,0), px, py + 60.f);
-        txt("3pts:  ██████░░░", 14, sf::Color(255,180,0), px, py + 80.f);
-        txt("Vel:   ███████░░", 14, sf::Color(255,180,0), px, py + 100.f);
-        txt("Def:   █████░░░░", 14, sf::Color(255,180,0), px, py + 120.f);
-
-        float px2 = W_ANCHO - 230.f;
-        sf::RectangleShape box2({280.f, 200.f});
-        box2.setPosition(px2 - 140.f, py - 20.f);
-        box2.setFillColor(equipoSeleccionado == 1
-            ? sf::Color(60,120,255,180) : sf::Color(20,30,60,120));
-        box2.setOutlineThickness(3.f);
-        box2.setOutlineColor(sf::Color(80,180,255));
-        ventana.draw(box2);
-
-        txt("RIVALES", 20, sf::Color(100,200,255), px2, py);
-        txt("Mistico x3", 14, sf::Color(200,220,255), px2, py + 33.f);
-        txt("Dunk:  ██████░░░", 14, sf::Color(100,180,255), px2, py + 60.f);
-        txt("3pts:  ████████░", 14, sf::Color(100,180,255), px2, py + 80.f);
-        txt("Vel:   ██████░░░", 14, sf::Color(100,180,255), px2, py + 100.f);
-        txt("Def:   ████████░", 14, sf::Color(100,180,255), px2, py + 120.f);
-
-        std::string flecha = equipoSeleccionado == 0 ? "◄" : "►";
-        txt(flecha, 32, sf::Color::Yellow, W_ANCHO/2.f, py + 60.f);
-
-        txt("← → para elegir   ENTER para jugar", 18,
-            sf::Color(180,180,180), W_ANCHO/2.f, 490.f);
-
-        // Controles extendidos
-        txt("WASD:Mover  LShift:Sprint  J:Tiro/Dunk-Aire  K:Pase  L:Robo/Finta",
-            12, sf::Color(130,130,130), W_ANCHO/2.f, 522.f);
-        txt("J+K(con balón):Saltar para Dunk  |  J+K(sin balón):Alley-oop receptor",
-            12, sf::Color(130,130,130), W_ANCHO/2.f, 540.f);
-        txt("J(def,tiro en vuelo):Bloquear  |  L(def):Empujar  |  Tab:Cambiar jugador",
-            12, sf::Color(130,130,130), W_ANCHO/2.f, 558.f);
-    }
-
-    // ─── Overlay de estado ────────────────────
-    void overlayTexto(const std::string& titulo, const std::string& sub) {
-        sf::RectangleShape ov({(float)W_ANCHO, (float)W_ALTO});
-        ov.setFillColor(sf::Color(0,0,0,150));
-        ventana.draw(ov);
-
-        sf::Text t, t2;
-        if (hud.fuenteOk) { t.setFont(hud.fuente); t2.setFont(hud.fuente); }
-        t.setString(titulo);  t.setCharacterSize(50);
-        t.setFillColor(sf::Color(255,220,50));
-        t.setOutlineThickness(3.f); t.setOutlineColor(sf::Color::Black);
-        sf::FloatRect b = t.getLocalBounds();
-        t.setOrigin(b.width/2.f, b.height/2.f);
-        t.setPosition(W_ANCHO/2.f, W_ALTO/2.f - 30.f);
-        ventana.draw(t);
-
-        t2.setString(sub); t2.setCharacterSize(20);
-        t2.setFillColor(sf::Color::White);
-        t2.setOutlineThickness(2.f); t2.setOutlineColor(sf::Color::Black);
-        sf::FloatRect b2 = t2.getLocalBounds();
-        t2.setOrigin(b2.width/2.f, 0.f);
-        t2.setPosition(W_ANCHO/2.f, W_ALTO/2.f + 30.f);
-        ventana.draw(t2);
-    }
-
-    // ─── EVENTOS ──────────────────────────────
-    void evento(sf::Event& e) {
-        if (e.type == sf::Event::Closed) ventana.close();
-        if (e.type != sf::Event::KeyPressed) return;
-
-        if (estado == EstadoJuego::SELECCION) {
-            if (e.key.code == sf::Keyboard::Left  || e.key.code == sf::Keyboard::A)
-                equipoSeleccionado = 0;
-            if (e.key.code == sf::Keyboard::Right || e.key.code == sf::Keyboard::D)
-                equipoSeleccionado = 1;
-            if (e.key.code == sf::Keyboard::Return) iniciarPartida();
-            if (e.key.code == sf::Keyboard::Escape) ventana.close();
-            return;
-        }
-
-        if (estado == EstadoJuego::MEDIO_TIEMPO && e.key.code == sf::Keyboard::Return) {
-            estado = EstadoJuego::JUGANDO;
-            hud.mensaje("", sf::Color::White, 0.f);
-            return;
-        }
-
-        if (estado == EstadoJuego::FIN) {
-            if (e.key.code == sf::Keyboard::R) {
-                estado = EstadoJuego::SELECCION;
-                hud.mensaje("", sf::Color::White, 0.f);
-            }
-            if (e.key.code == sf::Keyboard::Escape) ventana.close();
-            return;
-        }
-
-        if (estado == EstadoJuego::JUGANDO) {
-            if (e.key.code == sf::Keyboard::Tab) {
-                int sig = (eH.activo + 1) % 3;
-                if (!eH.j[sig].tienePelota) {
-                    eH.j[eH.activo].esHumano = false;
-                    eH.activo = sig;
-                    eH.j[eH.activo].esHumano = true;
-                }
-            }
-            if (e.key.code == sf::Keyboard::Escape) ventana.close();
-        }
-    }
-
-    // ─── LOOP PRINCIPAL ───────────────────────
-    void run() {
-        sf::Clock reloj;
-        while (ventana.isOpen()) {
-            float dt = reloj.restart().asSeconds();
-            dt = std::min(dt, 0.05f);
-
-            sf::Event e;
-            while (ventana.pollEvent(e)) evento(e);
-
-            update(dt);
-            dibujar();
-        }
-    }
+    
+    // ... resto del ciclo de métodos unificados del bucle principal
 };
-
-// ────────────────────────────────────────────
-int main() {
-    GameManager gm;
-    gm.run();
-    return 0;
-}
