@@ -1,6 +1,6 @@
 // ================================================================
 //   CARTOON DUNK  -  Street Hoop Style
-//   SFML 2.6  |  C++17  |  Código Corregido y Optimizado
+//   SFML 2.6  |  C++17  |  Código Corregido para MSYS2 (UCRT64)
 // ================================================================
 #include <SFML/Graphics.hpp>
 #include <SFML/Audio.hpp>
@@ -83,7 +83,6 @@ public:
     float tTotal=0, parpadeo=0, escLogo=0, alfaFondo=0, alfaPerso=0, ondaY=0;
     sf::Font& F; bool Fok;
 
-    // Las texturas ahora se reciben por referencia desde el GameManager para evitar tirones
     PantallaIntro(sf::Font& f, bool fok, const sf::Texture& tFondo, const sf::Texture& tGoku, const sf::Texture& tMistico, const sf::Texture& tPocoyo) 
         : F(f), Fok(fok) {
         
@@ -499,7 +498,6 @@ private:
     sf::RenderWindow ventana;
     sf::Font  fuente; bool fuenteOk = false;
 
-    // Almacenamiento centralizado de Texturas para evitar errores de ruta en cascada
     sf::Texture tFondo, tGoku, tMistico, tPocoyo;
 
     std::unique_ptr<PantallaIntro> pIntro;
@@ -535,7 +533,6 @@ public:
         fondoRect.setSize({(float)W_ANCHO,(float)W_ALTO});
         fondoRect.setFillColor(sf::Color(22,12,4));
 
-        // Carga única y segura de texturas al iniciar el juego
         tFondo.loadFromFile("assets/imagenes/pantalla inicial del juego.jpg");
         tGoku.loadFromFile("assets/imagenes/goku.png");
         tMistico.loadFromFile("assets/imagenes/mistico.png");
@@ -547,7 +544,6 @@ public:
             musica.play();
         }
 
-        // Construcción segura pasando las texturas cargadas
         pIntro = std::make_unique<PantallaIntro>(fuente, fuenteOk, tFondo, tGoku, tMistico, tPocoyo);
         pMenu  = std::make_unique<MenuPrincipal>(fuente, fuenteOk, tFondo, tGoku, tMistico, tPocoyo);
     }
@@ -640,6 +636,18 @@ public:
 
         cdTiro = 0.85f;
     }
-    
-    // ... resto del ciclo de métodos unificados del bucle principal
 };
+
+// ================================================================
+//   PUNTO DE ENTRADA CORREGIDO PARA EVITAR ERROR WINMAIN
+// ================================================================
+int main(int argc, char* argv[]) {
+    // Evita advertencias de variables no usadas por el compilador
+    (void)argc;
+    (void)argv;
+
+    GameManager juego;
+    // Aquí arrancaría tu bucle principal de ejecución del juego...
+    
+    return 0;
+}
