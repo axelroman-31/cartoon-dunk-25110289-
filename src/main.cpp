@@ -56,19 +56,20 @@ static DatosEquipo equipoCartoon() {
     d.dunk = 8; d.tres = 6; d.vel = 7; d.def = 5;
 
     // Sprite sheets de movimiento articulado
-    d.sprites[0] = "assets/imagenes/goku movimiento  mecanico.png";
+    d.sprites[0] = "assets/imagenes/goku movimiento  mecanico (2).png";
     d.sprites[1] = "assets/imagenes/pocoyo movimiento articulado.png";
     d.sprites[2] = "assets/imagenes/bugs movimiento articulado.png";
 
     // Sprites estáticos (fallback y pantalla de selección)
     d.spritesStatic[0] = "assets/imagenes/goku jugador.png";
-    d.spritesStatic[1] = "assets/imagenes/pocoyo jugador.png";
+    d.spritesStatic[1] = "assets/imagenes/pocoyo jugador (2).png";
     d.spritesStatic[2] = "assets/imagenes/bugs jugador.png";
 
-    // GOKU: sheet 896x875 | 8 cols x 5 rows | frame 112x175
-    d.sheetCols[0]=8; d.sheetRows[0]=5;
-    d.fWalk[0]=8; d.fRun[0]=8; d.fDribble[0]=6; d.fShoot[0]=4; d.fDunk[0]=4;
-    d.altoPx[0] = 88.f;
+    // GOKU: sheet 896x875 | 8 cols x 4 rows | frame 112x218
+    // Row 0=WALK(8) Row 1=RUN(8) Row 2=DRIBBLE(7) Row 3=DUNK/SHOOT(7)
+    d.sheetCols[0]=8; d.sheetRows[0]=4;
+    d.fWalk[0]=8; d.fRun[0]=8; d.fDribble[0]=7; d.fShoot[0]=7; d.fDunk[0]=7;
+    d.altoPx[0] = 92.f;
 
     // POCOYO: sheet 350x425 | 7 cols x 5 rows | frame 50x85
     d.sheetCols[1]=7; d.sheetRows[1]=5;
@@ -89,9 +90,9 @@ static DatosEquipo equipoRival() {
     d.dunk = 6; d.tres = 8; d.vel = 6; d.def = 8;
 
     // Sprite sheet de movimiento articulado (Místico)
-    d.sprites[0] = "assets/imagenes/mistico movimiento mecanico.png";
-    d.sprites[1] = "assets/imagenes/mistico movimiento mecanico.png";
-    d.sprites[2] = "assets/imagenes/mistico movimiento mecanico.png";
+    d.sprites[0] = "assets/imagenes/mistico movimiento articulado.png";
+    d.sprites[1] = "assets/imagenes/mistico movimiento articulado.png";
+    d.sprites[2] = "assets/imagenes/mistico movimiento articulado.png";
 
     // Sprites estáticos
     d.spritesStatic[0] = "assets/imagenes/mistico  jugador.png";
@@ -99,10 +100,11 @@ static DatosEquipo equipoRival() {
     d.spritesStatic[2] = "assets/imagenes/mistico  jugador.png";
 
     // MÍSTICO: sheet 431x538 | 7 cols x 5 rows | frame 61x107
+    // Row 0=WALK(7) Row 1=RUN(7) Row 2=DRIBBLE(5) Row 3=SHOOT/JUMP(4) Row 4=DUNK(3)
     for (int i=0;i<3;i++) {
         d.sheetCols[i]=7; d.sheetRows[i]=5;
         d.fWalk[i]=7; d.fRun[i]=7; d.fDribble[i]=5; d.fShoot[i]=4; d.fDunk[i]=3;
-        d.altoPx[i] = 82.f;
+        d.altoPx[i] = 84.f;
     }
     return d;
 }
@@ -124,7 +126,7 @@ public:
         okFondo=texFondo.loadFromFile("assets/imagenes/pantalla inicial del juego.jpg");
         okGA   =texGokuArt.loadFromFile("assets/imagenes/goku jugador.png");
         okMA   =texMisticoArt.loadFromFile("assets/imagenes/mistico  jugador.png");
-        okPA   =texPocoyoArt.loadFromFile("assets/imagenes/pocoyo jugador.png");
+        okPA   =texPocoyoArt.loadFromFile("assets/imagenes/pocoyo jugador (2).png");
         okPB   =texPixelBugs.loadFromFile("assets/imagenes/bugs jugador.png");
         if(okFondo){
             sprFondo.setTexture(texFondo);
@@ -242,7 +244,7 @@ public:
     MenuPrincipal(sf::Font& f,bool fok):F(f),Fok(fok){
         okFondo=texF.loadFromFile("assets/imagenes/pantalla inicial del juego.jpg");
         okG=texG.loadFromFile("assets/imagenes/goku jugador.png");
-        okP=texP.loadFromFile("assets/imagenes/pocoyo jugador.png");
+        okP=texP.loadFromFile("assets/imagenes/pocoyo jugador (2).png");
         okB=texB.loadFromFile("assets/imagenes/bugs jugador.png");
         okM=texM.loadFromFile("assets/imagenes/mistico  jugador.png");
         if(okFondo){

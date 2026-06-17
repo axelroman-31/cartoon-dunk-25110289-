@@ -2,6 +2,7 @@
 #include <SFML/Graphics.hpp>
 #include <string>
 #include <cmath>
+#include <algorithm>
 #include "Constantes.hpp"
 #include "Pelota.hpp"
 
@@ -34,6 +35,7 @@ struct SpriteSheet {
 
     bool cargar(const std::string& ruta, int c, int r) {
         if (!tex.loadFromFile(ruta)) return false;
+        tex.setSmooth(false);   // pixel art: sin suavizado
         ok   = true;
         cols = c; rows = r;
         frameW = (int)tex.getSize().x / c;
@@ -233,31 +235,33 @@ public:
     }
 
     // ─── Elegir animación según estado ───────────────
+    // rowShoot y rowDunk se calculan dinámicamente para soportar
+    // sheets con 4 o 5 filas (Goku=4, resto=5)
     void actualizarAnimacion(float dt) {
         if (!sheet.ok) return;
+        int maxRow    = sheet.rows - 1;
+        int rowShoot  = std::min(3, maxRow);   // tiro/salto
+        int rowDunk   = std::min(3, maxRow);   // dunk (en sheets de 4 filas = misma que shoot)
+        if (sheet.rows >= 5) rowDunk = 4;       // sheets de 5 filas tienen fila extra para dunk
+
         switch (estado) {
             case EstadoJ::IDLE:
                 sheet.setAnimacion(0, framesWalk, 6.f); break;
             case EstadoJ::CORRIENDO:
-                sheet.setAnimacion(1, framesRun,  10.f); break;
+                sheet.setAnimacion(1, framesRun, 10.f); break;
             case EstadoJ::LANZANDO:
             case EstadoJ::SUPER_SHOT:
-                sheet.setAnimacion(3, framesShoot, 9.f); break;
-            case EstadoJ::EN_AIRE:
-                sheet.setAnimacion(2, framesDribble, 8.f); break;
-            case EstadoJ::DUNKEANDO:
-                sheet.setAnimacion(4, framesDunk, 10.f); break;
             case EstadoJ::PASANDO:
-                sheet.setAnimacion(3, framesShoot, 9.f); break;
             case EstadoJ::BLOQUEANDO:
-                sheet.setAnimacion(3, framesShoot, 8.f); break;
+                sheet.setAnimacion(rowShoot, framesShoot, 9.f); break;
+            case EstadoJ::EN_AIRE:
             case EstadoJ::ROBANDO:
             case EstadoJ::EMPUJANDO:
-                sheet.setAnimacion(2, framesDribble, 9.f); break;
             case EstadoJ::FINTANDO:
-                sheet.setAnimacion(2, framesDribble, 12.f); break;
+                sheet.setAnimacion(2, framesDribble, 9.f); break;
+            case EstadoJ::DUNKEANDO:
             case EstadoJ::ALLEYOOP_VUELO:
-                sheet.setAnimacion(4, framesDunk, 8.f); break;
+                sheet.setAnimacion(rowDunk, framesDunk, 10.f); break;
             case EstadoJ::ATURDIDO:
                 sheet.setAnimacion(0, framesWalk, 5.f); break;
             default:
