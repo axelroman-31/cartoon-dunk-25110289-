@@ -1,0 +1,123 @@
+name: Build & Release Cartoon Dunk
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    name: Build (Linux)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Instalar dependencias SFML
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libsfml-dev \
+            libgl1-mesa-dev \
+            libudev-dev \
+            libopenal-dev \
+            libvorbis-dev \
+            libflac-dev
+
+      - name: Compilar
+        run: make
+
+      - name: Empaquetar release (Linux)
+        run: |
+          mkdir -p dist/CartoonDunk-linux
+          cp CartoonDunk dist/CartoonDunk-linux/
+          cp -r assets dist/CartoonDunk-linux/
+          cd dist
+          tar -czf CartoonDunk-linux.tar.gz CartoonDunk-linux/
+
+      - name: Subir artefacto Linux
+        uses: actions/upload-artifact@v4
+        with:
+          name: CartoonDunk-linux
+          path: dist/CartoonDunk-linux.tar.gz
+
+  build-windows:
+    name: Build (Windows / MinGW)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Instalar SFML via vcpkg
+        run: |
+          vcpkg install sfml:x64-windows
+          vcpkg integrate install
+
+      - name: Compilar
+        shell: cmd
+        run: |
+          g++ -std=c++17 -O2 -Wall -Iinclude ^
+            -I"%VCPKG_ROOT%\installed\x64-windows\include" ^
+            src/main.cpp -o bin/CartoonDunk.exe ^
+            -L"%VCPKG_ROOT%\installed\x64-windows\lib" ^
+            -lsfml-graphics -lsfml-window -lsfml-system -lsfml-audio
+
+      - name: Empaquetar release (Windows)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/CartoonDunk-windows
+          Copy-Item bin/CartoonDunk.exe dist/CartoonDunk-windows/
+          Copy-Item -Recurse assets dist/CartoonDunk-windows/
+          # Copiar DLLs de SFML necesarias
+          Copy-Item "$env:VCPKG_ROOT\installed\x64-windows\bin\sfml-*.dll" dist/CartoonDunk-windows/
+          Copy-Item "$env:VCPKG_ROOT\installed\x64-windows\bin\openal32.dll" dist/CartoonDunk-windows/ -ErrorAction SilentlyContinue
+          Compress-Archive -Path dist/CartoonDunk-windows -DestinationPath dist/CartoonDunk-windows.zip
+
+      - name: Subir artefacto Windows
+        uses: actions/upload-artifact@v4
+        with:
+          name: CartoonDunk-windows
+          path: dist/CartoonDunk-windows.zip
+
+  release:
+    name: Publicar Release
+    needs: [build-linux, build-windows]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar artefacto Linux
+        uses: actions/download-artifact@v4
+        with:
+          name: CartoonDunk-linux
+          path: dist/
+
+      - name: Descargar artefacto Windows
+        uses: actions/download-artifact@v4
+        with:
+          name: CartoonDunk-windows
+          path: dist/
+
+      - name: Crear GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Cartoon Dunk ${{ github.ref_name }}"
+          body: |
+            ## 🏀 Cartoon Dunk ${{ github.ref_name }}
+
+            Street Basketball 3v3 inspirado en Street Hoop / Street Slam (Data East, 1994).
+
+            ### Descarga
+            - **Linux**: `CartoonDunk-linux.tar.gz` — extrae y ejecuta `./CartoonDunk`
+            - **Windows**: `CartoonDunk-windows.zip` — extrae y ejecuta `CartoonDunk.exe`
+
+            > La carpeta `assets/` debe estar en el mismo directorio que el ejecutable.
+          files: |
+            dist/CartoonDunk-linux.tar.gz
+            dist/CartoonDunk-windows.zip
+          draft: false
+          prerelease: false
