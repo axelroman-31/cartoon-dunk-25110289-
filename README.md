@@ -70,9 +70,7 @@ Cartoon Dunk es un juego de baloncesto callejero 3 contra 3 donde controlas a pe
 
 ## 👥 Equipo
 
-- **Líder**: Nombre Completo (@usuario-github)
-- **Integrante 2**: Nombre Completo (@usuario-github)
-- **Integrante 3**: Nombre Completo (@usuario-github)
+- **Desarrollador**: Carlo Axel Roman Martinez (@axelroman-31)
 
 ---
 

@@ -1,123 +1,127 @@
-name: Build & Release Cartoon Dunk
+name: Publicar en Galería CETUS
 
 on:
   push:
-    tags:
-      - "v*.*.*"
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build-linux:
-    name: Build (Linux)
+  publish:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout código
+      - name: 📥 Checkout código
         uses: actions/checkout@v4
 
-      - name: Instalar dependencias SFML
+      - name: 🔢 Generar versión
+        id: version
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libsfml-dev \
-            libgl1-mesa-dev \
-            libudev-dev \
-            libopenal-dev \
-            libvorbis-dev \
-            libflac-dev
+          VERSION="v1.0.${{ github.run_number }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Versión generada: $VERSION"
 
-      - name: Compilar
-        run: make
-
-      - name: Empaquetar release (Linux)
+      - name: 📦 Empaquetar ejecutable
         run: |
-          mkdir -p dist/CartoonDunk-linux
-          cp CartoonDunk dist/CartoonDunk-linux/
-          cp -r assets dist/CartoonDunk-linux/
-          cd dist
-          tar -czf CartoonDunk-linux.tar.gz CartoonDunk-linux/
+          echo "Empaquetando bin/ y assets/ en un ZIP..."
+          mkdir -p release-package
 
-      - name: Subir artefacto Linux
-        uses: actions/upload-artifact@v4
+          # Copiar ejecutable
+          if [ -d "bin" ]; then
+            cp -r bin/* release-package/ 2>/dev/null || echo "⚠️ Carpeta bin/ vacía o no existe"
+          fi
+
+          # Copiar assets
+          if [ -d "assets" ]; then
+            cp -r assets release-package/ 2>/dev/null || echo "⚠️ Carpeta assets/ vacía o no existe"
+          fi
+
+          # Crear ZIP
+          cd release-package
+          zip -r ../cartoon-dunk.zip . || echo "⚠️ Error al crear ZIP"
+          cd ..
+
+          # Mostrar tamaño
+          SIZE=$(du -h cartoon-dunk.zip | cut -f1)
+          echo "✅ ZIP creado: $SIZE"
+
+      - name: 🚀 Crear Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: CartoonDunk-linux
-          path: dist/CartoonDunk-linux.tar.gz
-
-  build-windows:
-    name: Build (Windows / MinGW)
-    runs-on: windows-latest
-
-    steps:
-      - name: Checkout código
-        uses: actions/checkout@v4
-
-      - name: Instalar SFML via vcpkg
-        run: |
-          vcpkg install sfml:x64-windows
-          vcpkg integrate install
-
-      - name: Compilar
-        shell: cmd
-        run: |
-          g++ -std=c++17 -O2 -Wall -Iinclude ^
-            -I"%VCPKG_ROOT%\installed\x64-windows\include" ^
-            src/main.cpp -o bin/CartoonDunk.exe ^
-            -L"%VCPKG_ROOT%\installed\x64-windows\lib" ^
-            -lsfml-graphics -lsfml-window -lsfml-system -lsfml-audio
-
-      - name: Empaquetar release (Windows)
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path dist/CartoonDunk-windows
-          Copy-Item bin/CartoonDunk.exe dist/CartoonDunk-windows/
-          Copy-Item -Recurse assets dist/CartoonDunk-windows/
-          # Copiar DLLs de SFML necesarias
-          Copy-Item "$env:VCPKG_ROOT\installed\x64-windows\bin\sfml-*.dll" dist/CartoonDunk-windows/
-          Copy-Item "$env:VCPKG_ROOT\installed\x64-windows\bin\openal32.dll" dist/CartoonDunk-windows/ -ErrorAction SilentlyContinue
-          Compress-Archive -Path dist/CartoonDunk-windows -DestinationPath dist/CartoonDunk-windows.zip
-
-      - name: Subir artefacto Windows
-        uses: actions/upload-artifact@v4
-        with:
-          name: CartoonDunk-windows
-          path: dist/CartoonDunk-windows.zip
-
-  release:
-    name: Publicar Release
-    needs: [build-linux, build-windows]
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Descargar artefacto Linux
-        uses: actions/download-artifact@v4
-        with:
-          name: CartoonDunk-linux
-          path: dist/
-
-      - name: Descargar artefacto Windows
-        uses: actions/download-artifact@v4
-        with:
-          name: CartoonDunk-windows
-          path: dist/
-
-      - name: Crear GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: "Cartoon Dunk ${{ github.ref_name }}"
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Release ${{ steps.version.outputs.version }}
           body: |
-            ## 🏀 Cartoon Dunk ${{ github.ref_name }}
+            ## 🏀 Cartoon Dunk - Release ${{ steps.version.outputs.version }}
 
-            Street Basketball 3v3 inspirado en Street Hoop / Street Slam (Data East, 1994).
+            **Commit:** ${{ github.sha }}
+            **Autor:** ${{ github.event.head_commit.author.name }}
+            **Fecha:** ${{ github.event.head_commit.timestamp }}
 
-            ### Descarga
-            - **Linux**: `CartoonDunk-linux.tar.gz` — extrae y ejecuta `./CartoonDunk`
-            - **Windows**: `CartoonDunk-windows.zip` — extrae y ejecuta `CartoonDunk.exe`
+            ### 📝 Mensaje del Commit
+            ${{ github.event.head_commit.message }}
 
-            > La carpeta `assets/` debe estar en el mismo directorio que el ejecutable.
-          files: |
-            dist/CartoonDunk-linux.tar.gz
-            dist/CartoonDunk-windows.zip
+            ### 📦 Contenido
+            - Ejecutable del juego (`CartoonDunk.exe`)
+            - Assets necesarios (imágenes, música, fuente)
+
+            ### ⬇️ Descarga
+            Descarga `cartoon-dunk.zip`, extrae y ejecuta `CartoonDunk.exe`.
           draft: false
           prerelease: false
+          files: |
+            cartoon-dunk.zip
+
+      - name: 📡 Notificar a CETUS
+        run: |
+          echo "🔔 Enviando notificación a CETUS..."
+
+          RELEASE_URL="${{ steps.create_release.outputs.url }}"
+
+          # Construir payload JSON
+          cat > payload.json <<EOF
+          {
+            "action": "published",
+            "repository": {
+              "full_name": "${{ github.repository }}",
+              "html_url": "${{ github.event.repository.html_url }}"
+            },
+            "release": {
+              "tag_name": "${{ steps.version.outputs.version }}",
+              "html_url": "$RELEASE_URL",
+              "target_commitish": "${{ github.sha }}",
+              "assets": [
+                {
+                  "name": "cartoon-dunk.zip",
+                  "browser_download_url": "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/cartoon-dunk.zip",
+                  "size": $(stat -c%s cartoon-dunk.zip)
+                }
+              ]
+            }
+          }
+          EOF
+
+          # Enviar webhook a CETUS
+          curl -X POST https://cetus.logiasimbolica.com/api/webhook/github \
+            -H "Content-Type: application/json" \
+            -H "X-GitHub-Event: release" \
+            -d @payload.json \
+            -w "\n📊 Status: %{http_code}\n" \
+            || echo "⚠️ Error al notificar a CETUS (el proyecto aún se puede ver en GitHub Releases)"
+
+          echo "✅ Proceso completado"
+
+      - name: 📋 Resumen
+        run: |
+          echo "## 🎉 Publicación Exitosa" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Versión:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release:** [Ver en GitHub](${{ steps.create_release.outputs.url }})" >> $GITHUB_STEP_SUMMARY
+          echo "- **Descarga:** [cartoon-dunk.zip](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/cartoon-dunk.zip)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Tu proyecto se actualizará en la galería CETUS en unos momentos." >> $GITHUB_STEP_SUMMARY
