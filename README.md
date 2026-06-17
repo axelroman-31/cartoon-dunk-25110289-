@@ -1,108 +1,212 @@
 # 🏀 Cartoon Dunk
 
-> *Street Basketball 3v3 inspirado en Street Slam / Street Hoop (Data East, 1994)*
+Videojuego de baloncesto callejero arcade **3 contra 3**, inspirado en **Street Slam / Street Hoop** de Data East (Neo Geo, 1994). Personajes de caricaturas icónicas se enfrentan en la cancha de los Houston Rockets en partidos rápidos y espectaculares.
+
+---
+
+## 📋 Estructura del Repositorio
+
+```
+cartoon-dunk/
+├── .github/
+│   └── workflows/
+│       └── publish.yml          ← GitHub Action (auto-deploy)
+│
+├── video/
+│   └── demo.mp4                 ← Video de gameplay (máx 2 min)
+│
+├── gallery/
+│   └── cover.png                ← Portada del juego (720x1080)
+│
+├── screenshots/
+│   ├── screenshot1.png          ← Pantalla de inicio
+│   ├── screenshot2.png          ← Selección de equipo
+│   └── screenshot3.png          ← Gameplay en cancha
+│
+├── bin/
+│   └── CartoonDunk.exe          ← Ejecutable del juego
+│
+├── assets/
+│   ├── imagenes/                ← Sprites y fondos
+│   ├── front/                   ← Fuentes
+│   └── musica/                  ← Música del juego
+│
+├── include/                     ← Headers C++
+├── src/                         ← Código fuente
+├── makefile
+└── README.md
+```
+
+---
+
+## 🎬 Video de Gameplay
+
+> **📁 Coloca aquí el video:**
+> `video/demo.mp4`
+>
+> - Duración máxima: **2 minutos**
+> - Formato: MP4
+> - Resolución recomendada: 1280×720 o superior
+> - Contenido sugerido: intro animada → selección de equipo → partido completo con dunk y super shot
+
+---
+
+## 🖼️ Capturas de Pantalla
+
+| Pantalla de Inicio | Selección de Equipo | Gameplay |
+|---|---|---|
+| screenshot1.png | screenshot2.png | screenshot3.png |
 
 ---
 
 ## 🎯 Objetivo del Juego
 
-Cartoon Dunk es un juego de baloncesto callejero 3 contra 3 donde controlas a personajes icónicos del mundo animado. El objetivo es anotar más puntos que el equipo rival antes de que se acaben las dos mitades de 2 minutos cada una. Puedes ganar puntos con tiros de 2 o 3 puntos, mates espectaculares y Super Shots. ¡El equipo con más puntos al final gana!
+Derrota al equipo rival anotando más puntos en **2 mitades de 2 minutos**. Usa combos, pases estratégicos y el **Super Shot** para ganar. El equipo con más puntos al sonar el tiempo final gana el partido.
 
 ---
 
 ## 🎮 Controles
 
-### Movimiento
 | Tecla | Acción |
-|-------|--------|
-| `W` `A` `S` `D` | Mover al jugador activo |
+|---|---|
+| `W / A / S / D` | Mover al jugador activo |
 | `LShift` | Sprint (correr más rápido) |
-| `Tab` | Cambiar de jugador activo |
-
-### Ofensiva (con balón)
-| Tecla | Acción |
-|-------|--------|
-| `J` | Tiro normal (2 o 3 puntos según la distancia) |
-| `K` | Pasar al compañero libre |
-| `J + K` | Saltar para ejecutar un mate |
-| `J` *(en el aire)* | Ejecutar el mate (dunk) |
+| `Tab` | Cambiar jugador activo |
+| `J` | Tiro normal (2 o 3 pts según distancia) |
+| `K` | Pasar al compañero más libre |
+| `J + K` | Saltar para dunk |
+| `J` (en el aire) | Ejecutar el dunk |
 | `L` | Finta / amago de tiro |
-| `Super + J` | **Super Shot** (cuando el medidor está lleno) |
-
-### Defensiva (sin balón)
-| Tecla | Acción |
-|-------|--------|
-| `J` | Bloquear tiro o empujar rival |
-| `K` | Robo de balón |
-| `L` | Empuje directo |
-| `J + K` *(sin balón)* | Posicionarse como receptor de alley-oop |
+| `J` (sin balón) | Bloquear tiro rival / Empujar |
+| `K` (sin balón) | Intentar robo de balón |
+| `J + K` (sin balón) | Activar Alley-Oop (receptor salta) |
+| `ESC` | Volver al menú |
 
 ---
 
-## ⚙️ Mecánicas
+## ⚙️ Mecánicas Principales
 
-- **Tiro 2/3 puntos** — La distancia al aro determina si el lanzamiento vale 2 o 3 puntos. La línea de tres puntos está a 210 unidades del centro del aro.
-- **Dunk** — Presiona `J+K` para saltar y luego `J` en el aire para ejecutar un mate cuando estés cerca del aro.
-- **Alley-Oop** — Sin el balón, presiona `J+K` para volar hacia el aro y recibir el pase de tu compañero para un mate en colaboración. ¡Llena mucho el Super Meter!
-- **Super Shot** — Cuando el medidor especial llega al 100%, tu siguiente tiro se convierte en un Super Shot imparable.
-- **Finta** — Con `L` puedes amagar un tiro para desequilibrar al defensor sin soltar el balón.
-- **Bloqueo** — Con `J` sin el balón puedes saltar para bloquear los tiros rivales dentro del radio de bloqueo.
-- **Robo** — Con `K` sin el balón intentas robar el esférico si estás dentro del radio de robo.
-- **Empuje físico** — Los choques físicos pueden aturdir momentáneamente a los jugadores rivales.
-- **Super Meter** — Se llena anotando encestes, realizando pases, robos, bloqueos y alley-oops. Se regenera lentamente con el tiempo.
+### 🏀 Sistema de Tiro
+- **Tiro de 2 puntos** — dentro de la línea de 3 puntos
+- **Tiro de 3 puntos** — fuera de la línea de 3 puntos
+- La probabilidad de anotar depende del atributo del jugador y la distancia al aro
+
+### 💥 Dunk en Aire (Combo)
+Inspirado directamente en el botón A+B del Street Hoop original:
+1. Presiona `J + K` para que el jugador salte
+2. Presiona `J` mientras está en el aire para ejecutar el dunk
+3. El dunk tiene mayor probabilidad de anotar que un tiro normal
+
+### ⚡ Super Meter
+- Barra que se llena con: encestes, pases, robos, bloqueos y alley-oops
+- Al llenarse completamente, el siguiente tiro se convierte en un **Super Shot** casi imparable
+- Se consume al usarse
+
+### 🤝 Alley-Oop
+1. Sin balón, presiona `J + K` para que tu jugador salte hacia el aro
+2. El compañero con balón debe presionar `K` para enviar el pase elevado
+3. Al recibirlo, se ejecuta automáticamente un dunk espectacular
+
+### 🛡️ Defensa
+- **Robo**: acércate al portador y presiona `K`
+- **Bloqueo**: cuando la pelota está en vuelo, presiona `J` cerca de ella
+- **Empuje**: presiona `J` o `L` cerca de un rival para descolocarlo
+- **Intercepción**: posiciónate en la trayectoria de un pase rival
+
+### 🏃 Estamina
+- El sprint consume estamina gradualmente
+- La estamina se recupera sola al caminar o estar parado
+- Con poca estamina, la velocidad y precisión de tiro se reducen
 
 ---
 
-## 🏆 Características
+## 🏆 Pantallas del Juego
 
-- Partido 1 Jugador vs CPU en formato 3v3
-- Dos mitades de 2 minutos cada una (4 minutos totales por partido)
-- Dos equipos seleccionables con estadísticas distintas: **CARTOON** (alto dunk y velocidad) y **RIVALES** (alto tiro de 3 y defensa)
-- Personajes animados con sprites articulados de movimiento: Goku, Pocoyo, Bugs Bunny y Místico
-- Cancha inspirada en el Toyota Center de los Houston Rockets
-- Sistema de Super Meter con Super Shot especial
-- Mecánicas arcade avanzadas: alley-oop, finta, bloqueo, robo y empuje físico
-- Música de ambiente y fuente personalizada
-- Pantalla de selección de equipo, menú principal con créditos y pantalla de fin de partida
-- Pantalla de medio tiempo entre mitades
+```
+INTRO → MENÚ PRINCIPAL → SELECCIÓN DE EQUIPO → PARTIDO → MEDIO TIEMPO → RESULTADO FINAL
+```
+
+- **Intro**: Logo animado con arte de todos los personajes y partículas
+- **Menú Principal**: Navegar con W/S, opciones de Jugar / Controles / Créditos / Salir
+- **Selección de Equipo**: Elige entre Cartoon Dunk o Rivales, con stats visuales
+- **Partido**: 2 mitades de 2 minutos, HUD con marcador, tiempo y Super Meter
+- **Medio Tiempo**: Pausa entre mitades, presiona Enter para continuar
+- **Resultado**: Marcador final + estadísticas de robos, bloqueos, asistencias y alley-oops
 
 ---
 
-## 👥 Equipo
+## 👥 Equipos
 
-- **Desarrollador**: Carlo Axel Roman Martinez (@axelroman-31)
+### 🟠 CARTOON DUNK
+| Jugador | Dunk | 3 Pts | Velocidad | Defensa |
+|---|---|---|---|---|
+| Goku (SS3) | ████████░ 8/9 | ██████░░░ 6/9 | ███████░░ 7/9 | █████░░░░ 5/9 |
+| Pocoyo | ████████░ 8/9 | ██████░░░ 6/9 | ███████░░ 7/9 | █████░░░░ 5/9 |
+| Bugs Bunny | ████████░ 8/9 | ██████░░░ 6/9 | ███████░░ 7/9 | █████░░░░ 5/9 |
+
+### 🔵 RIVALES
+| Jugador | Dunk | 3 Pts | Velocidad | Defensa |
+|---|---|---|---|---|
+| Místico | ██████░░░ 6/9 | ████████░ 8/9 | ██████░░░ 6/9 | ████████░ 8/9 |
+| Místico | ██████░░░ 6/9 | ████████░ 8/9 | ██████░░░ 6/9 | ████████░ 8/9 |
+| Místico | ██████░░░ 6/9 | ████████░ 8/9 | ██████░░░ 6/9 | ████████░ 8/9 |
 
 ---
 
 ## 🛠️ Tecnologías
 
-- **Motor/Framework**: SFML 2.6
+- **Motor gráfico**: SFML 2.6
 - **Lenguaje**: C++17
-- **Librerías adicionales**: SFML Graphics, SFML Audio
-- **Build**: Makefile
-- **Ejecutable**: `bin/CartoonDunk.exe`
+- **Sistema de sprites**: Sprite sheets animados (walk / run / dribble / shoot / dunk)
+- **Física**: Arco parabólico para tiros y pases, colisiones entre jugadores
+- **IA**: Toma de decisiones ofensiva y defensiva con probabilidades dinámicas
+
+---
+
+## 📦 Cómo Compilar
+
+```bash
+# Requiere: g++ con C++17, SFML 2.6 instalado
+make
+./CartoonDunk
+```
+
+En Ubuntu/Debian:
+```bash
+sudo apt-get install libsfml-dev
+make
+```
+
+---
+
+## 👥 Equipo
+
+- **Desarrollador**: [Tu nombre] (@usuario-github)
 
 ---
 
 ## 📜 Créditos
 
-- **Inspirado en**: Street Slam / Street Hoop (Data East, 1994)
-- **Personajes**: Goku, Pocoyo, Bugs Bunny, Místico
+- **Inspirado en**: Street Slam / Street Hoop — Data East Corporation (1994, Neo Geo)
+- **Sprites**: Goku (Dragon Ball Z) · Pocoyo · Bugs Bunny (Looney Tunes) · Místico (Lucha Libre AAA)
 - **Cancha**: Houston Rockets — Toyota Center
-- **Música**: `Gang$tazz.ogg`
-- **Fuente**: `texto.ttf`
-- **Mecánicas**: Tiro 2/3 pts · Dunk · Super Shot · Alley-Oop · Finta · Bloqueo · Robo · Empuje físico
+- **Música**: Gang$tazz.ogg
+- **Motor**: SFML 2.6 — [sfml-dev.org](https://www.sfml-dev.org)
 
 ---
 
-## 🚀 Cómo ejecutar
+## ⚠️ Validaciones CETUS
 
-```bash
-# Compilar (requiere SFML 2.6 instalado)
-make
+El sistema verificará automáticamente:
 
-# Ejecutar el juego
-./bin/CartoonDunk.exe
-```
+- ✓ `video/demo.mp4` — video de gameplay
+- ✓ `gallery/cover.png` — portada 720×1080
+- ✓ `screenshots/screenshot1.png` — mínimo 3 capturas
+- ✓ `screenshots/screenshot2.png`
+- ✓ `screenshots/screenshot3.png`
+- ✓ `bin/CartoonDunk.exe` — ejecutable
+- ✓ `README.md` — este archivo
 
-> Asegúrate de tener la carpeta `assets/` en el mismo directorio que el ejecutable.
+---
+
+*Proyecto 252 — Cartoon Dunk © 2025*
