@@ -40,11 +40,11 @@ jobs:
 
           # Crear ZIP
           cd release-package
-          zip -r ../juego-proyecto-252.zip . || echo "⚠️ Error al crear ZIP"
+          zip -r ../cartoon-dunk.zip . || echo "⚠️ Error al crear ZIP"
           cd ..
 
           # Mostrar tamaño
-          SIZE=$(du -h juego-proyecto-252.zip | cut -f1)
+          SIZE=$(du -h cartoon-dunk.zip | cut -f1)
           echo "✅ ZIP creado: $SIZE"
 
       - name: 🚀 Crear Release
@@ -56,7 +56,7 @@ jobs:
           tag_name: ${{ steps.version.outputs.version }}
           name: Release ${{ steps.version.outputs.version }}
           body: |
-            ## 🎮 Proyecto 252 - Release ${{ steps.version.outputs.version }}
+            ## 🏀 Cartoon Dunk - Release ${{ steps.version.outputs.version }}
 
             **Commit:** ${{ github.sha }}
             **Autor:** ${{ github.event.head_commit.author.name }}
@@ -66,15 +66,15 @@ jobs:
             ${{ github.event.head_commit.message }}
 
             ### 📦 Contenido
-            - Ejecutable del juego
-            - Assets necesarios
+            - Ejecutable del juego (`CartoonDunk.exe`)
+            - Assets necesarios (imágenes, música, fuente)
 
             ### ⬇️ Descarga
-            Descarga `juego-proyecto-252.zip` para jugar.
+            Descarga `cartoon-dunk.zip`, extrae y ejecuta `CartoonDunk.exe`.
           draft: false
           prerelease: false
           files: |
-            juego-proyecto-252.zip
+            cartoon-dunk.zip
 
       - name: 📡 Notificar a CETUS
         run: |
@@ -96,16 +96,16 @@ jobs:
               "target_commitish": "${{ github.sha }}",
               "assets": [
                 {
-                  "name": "juego-proyecto-252.zip",
-                  "browser_download_url": "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/juego-proyecto-252.zip",
-                  "size": $(stat -c%s juego-proyecto-252.zip)
+                  "name": "cartoon-dunk.zip",
+                  "browser_download_url": "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/cartoon-dunk.zip",
+                  "size": $(stat -c%s cartoon-dunk.zip)
                 }
               ]
             }
           }
           EOF
 
-          # Enviar webhook a CETUS (sin autenticación para simplicidad)
+          # Enviar webhook a CETUS
           curl -X POST https://cetus.logiasimbolica.com/api/webhook/github \
             -H "Content-Type: application/json" \
             -H "X-GitHub-Event: release" \
@@ -122,6 +122,6 @@ jobs:
           echo "- **Versión:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Release:** [Ver en GitHub](${{ steps.create_release.outputs.url }})" >> $GITHUB_STEP_SUMMARY
-          echo "- **Descarga:** [juego-proyecto-252.zip](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/juego-proyecto-252.zip)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Descarga:** [cartoon-dunk.zip](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/cartoon-dunk.zip)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Tu proyecto se actualizará en la galería CETUS en unos momentos." >> $GITHUB_STEP_SUMMARY

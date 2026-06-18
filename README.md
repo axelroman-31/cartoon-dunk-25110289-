@@ -181,7 +181,7 @@ make
 
 ## 👥 Equipo
 
-- **Desarrollador**: [Tu nombre] (@usuario-github)
+- **Desarrollador**: [Carlo Axel Román Martínez] (@axelroman-31)
 
 ---
 
