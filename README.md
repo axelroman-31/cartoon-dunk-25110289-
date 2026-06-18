@@ -189,7 +189,7 @@ make
 
 - **Inspirado en**: Street Slam / Street Hoop — Data East Corporation (1994, Neo Geo)
 - **Sprites**: Goku (Dragon Ball Z) · Pocoyo · Bugs Bunny (Looney Tunes) · Místico (Lucha Libre AAA)
-- **Cancha**: Houston Rockets — Toyota Center
+- **Cancha**: Astros de Jalisco — Arena astros
 - **Música**: Gang$tazz.ogg
 - **Motor**: SFML 2.6 — [sfml-dev.org](https://www.sfml-dev.org)
 
